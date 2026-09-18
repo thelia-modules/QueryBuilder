@@ -24,7 +24,7 @@ modules via les points d'extension ci-dessous.
 Le fichier de base est `Config/query_builder.yml` (tables core Thelia). Tout
 module **actif** peut exposer son propre `Config/query_builder.yml`, fusionné
 par-dessus (l'en-tête du fichier de base documente la syntaxe complète :
-`joins`, `fields`, `contexts`, `disabled`).
+`joins`, `fields`, `contexts`, `disabled`, `disabled_hooks`).
 
 Deux types de champs :
 
@@ -82,14 +82,44 @@ utilisateur.
   produits (ex : catalogue du client connecté) ;
 - `QueryBuilder\Query\RuntimeParameterProviderInterface` — expose des
   placeholders projet (ex : `:customer_typology_id`) ;
+- `QueryBuilder\Query\ProductOrderProviderInterface` — le classement projet
+  des produits sélectionnés (ex : classement par typologie de client) ;
+- `QueryBuilder\Query\ProductFamilyProviderInterface` — la notion projet de
+  « famille » d'un produit (ex : niveau 2 de l'arbre catalogue), pour le panachage ;
 - `QueryBuilder\Action\ActionInterface` — nouvelle action prédéfinie
   (`DisplayProductsList` et `ApplyDiscount` sont fournies).
+
+## Sélection des produits (`ProductSelector`)
+
+Toute sélection de produits — bloc d'affichage, produits remisés d'une action
+limitée ou persistée — passe par `QueryBuilder\Service\ProductSelector`, seule
+source du classement :
+
+1. **Classement SQL** : expressions des `ProductOrderProviderInterface` (projet),
+   puis les produits *promus* par l'appelant (les actions d'affichage promeuvent
+   les produits actuellement remisés par une règle : à qualification égale, un
+   produit en offre passe devant), puis la rotation des cycles sticky (jamais
+   proposé d'abord, puis fin de cycle la plus ancienne), puis `product.id`.
+   Le `LIMIT` d'une sélection s'applique après ce tri.
+2. **Panachage PHP** : chaque place prend le meilleur candidat dont aucune
+   famille n'est déjà présente (familles des produits déjà engagés dans le
+   bloc comprises) ; si tous les candidats répètent une famille présente, le
+   mieux classé est pris quand même plutôt que de laisser la place vide.
+
+Le classement ne s'applique **jamais** dans `SqlBuilder::compile()` seul ni dans
+un scope : l'éligibilité des règles et les requêtes brutes restent non triées.
+Les remises se sélectionnent sans produits promus (elles sont ce que l'on
+résout : les promouvoir bouclerait). Chemin sticky (`StickySelectionService`,
+tronc commun des suggestions affichées et des remises persistées : cycles
+actifs encore affichables, puis refill enregistré) : le refill suit la
+sélection, la persistance et la rotation ne changent pas, le bloc assemblé est
+re-trié pour l'affichage seulement.
 
 Événement Symfony `QueryBuilder\Event\QueryBuilderRulesChangedEvent` :
 dispatché après toute mutation back-office d'une règle ou d'une action
 (création, sauvegarde, activation/désactivation, suppression). À écouter côté
 projet pour invalider les caches qui embarquent des résultats de règles —
-ex. `Scal\EventListener\ProductCacheInvalidationListener` (#574).
+ex. un écouteur projet qui invalide le cache des fiches produit.
 
 ## Remises (action `ApplyDiscount`)
 
@@ -119,9 +149,8 @@ La résolution se fait à la demande via
 (map `productId → Discount`, le meilleur taux gagne, memoïzation par requête).
 C'est au projet de brancher cette map sur son pricing (prix affichés, panier,
 export ERP) — l'endpoint JSON et le plugin Smarty exposent déjà les offres
-des produits retournés (`offers`). Le refill des suggestions display suit la
-même rotation que les remises (jamais-suggérés d'abord, puis anciens cycles
-du plus vieux au plus récent).
+des produits retournés (`offers`). Le refill des suggestions display et celui
+des remises suivent la même sélection (`ProductSelector`, section ci-dessus).
 
 Les cycles en cours ne re-vérifient **pas** l'arbre de conditions (seuls les
 scopes globaux — visibilité, prix, catalogue — sont re-contrôlés). Pour éviter
@@ -129,11 +158,15 @@ qu'une modification de règle continue de servir des produits désormais exclus,
 la sauvegarde d'une action dont l'arbre de conditions a changé expire
 automatiquement ses cycles actifs : les slots sont re-remplis au prochain
 affichage avec les nouvelles conditions (l'historique de rotation est
-conservé). Une sauvegarde ne touchant que les paramètres (limite, libellé,
-taux…) ne réinitialise rien.
+conservé). Même expiration quand le code de l'action ou `persist_days` change
+(ajout, retrait, autre durée) ou quand l'action est désactivée (sauvegarde ou interrupteur de
+la liste) : un cycle ne survit pas à la persistance qui l'a créé, réactiver
+repart d'une sélection propre. Une sauvegarde ne touchant que les autres
+paramètres (limite, libellé, taux…) ne réinitialise rien.
 
 ⚠️ L'arbre d'une action remise est évalué sur **toutes** les surfaces, y
-compris à l'ajout au panier et à la création de commande. Les conditions de
+compris à l'ajout au panier, à la suppression d'une ligne (les lignes
+restantes sont alors re-remisées) et à la création de commande. Les conditions de
 sélection reco y sont auto-destructrices : « produit présent dans le panier =
 faux » annule la remise à l'instant où le produit entre au panier, « acheté
 récemment = faux » l'annule à la création de commande (la ligne venant d'être
@@ -218,7 +251,7 @@ modules casse silencieusement et l'éditeur ne s'affiche pas.
 
 ```bash
 php Thelia querybuilder:dictionary [CONTEXT]   # dictionnaire fusionné
-php Thelia querybuilder:compile '<json>' --customer=42 --execute
+php Thelia querybuilder:compile '<json>' --customer=42 --ordered --execute
 php Thelia querybuilder:run product.top --customer=42 --product=123
 ```
 

@@ -265,7 +265,7 @@
                                         <td><code>{$action.code}</code></td>
                                         <td><span class="label label-default">{$action.type}</span></td>
                                         <td>
-                                            <form method="POST" action="{token_url path="/admin/query_builder/rule/`$rule.id`/action/`$action.id`/toggle"}" style="display:inline;">
+                                            <form method="POST" action="{token_url path="/admin/query_builder/rule/`$rule.id`/action/`$action.id`/toggle"}" style="display:inline;"{if $action.activate} onsubmit="return confirm('{intl l='Désactiver cette action met fin aux suggestions et remises en cours de tous les clients. Continuer ?' d='querybuilder.bo.default' js=1}');"{/if}>
                                                 {if $action.activate}
                                                     <button type="submit" class="btn btn-xs btn-success" title="{intl l='Cliquer pour désactiver' d='querybuilder.bo.default'}">{intl l="Active" d='querybuilder.bo.default'}</button>
                                                 {else}

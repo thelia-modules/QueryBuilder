@@ -6,6 +6,7 @@ namespace QueryBuilder\Service;
 
 use Propel\Runtime\ActiveQuery\Criteria;
 use QueryBuilder\Model\QueryBuilderAction;
+use QueryBuilder\Model\QueryBuilderRule;
 use QueryBuilder\Model\QueryBuilderSuggestion;
 use QueryBuilder\Model\QueryBuilderSuggestionQuery;
 
@@ -100,72 +101,86 @@ final class SuggestionService
     }
 
     /**
-     * Ends the active cycles of the action for every customer. Called when the
-     * action condition tree changes: the sticky path never re-checks the tree,
-     * so a still-running cycle would keep serving products the new conditions
-     * exclude until its natural expiry.
+     * Ends the active cycles of the action for every customer when the saved
+     * action no longer matches the state its cycles were created in (see
+     * ActionCycleState): a still-running cycle belongs to the selection it
+     * was created from, not to the new one.
      */
+    public function expireCyclesInvalidatedBy(ActionCycleState $previousState, QueryBuilderAction $action): void
+    {
+        if ($previousState->invalidatesCyclesOf(ActionCycleState::fromAction($action))) {
+            $this->expireActiveCycles((int) $action->getId());
+        }
+    }
+
+    /**
+     * Same at rule level (see RuleCycleState): the cycles of every action of
+     * the rule end when the customers it targets or its activation change.
+     */
+    public function expireRuleCyclesInvalidatedBy(RuleCycleState $previousState, QueryBuilderRule $rule): void
+    {
+        if ($previousState->invalidatesCyclesOf(RuleCycleState::fromRule($rule))) {
+            $this->expireActiveCyclesOfRule((int) $rule->getId());
+        }
+    }
+
+    /** Ends the active cycles of the action for every customer. */
     public function expireActiveCycles(int $actionId): void
+    {
+        $this->expireNow(QueryBuilderSuggestionQuery::create()->filterByActionId($actionId));
+    }
+
+    /** Ends the active cycles of every action of the rule, for every customer. */
+    public function expireActiveCyclesOfRule(int $ruleId): void
+    {
+        $this->expireNow(QueryBuilderSuggestionQuery::create()->filterByRuleId($ruleId));
+    }
+
+    /**
+     * Ends the cycles of the given products for one customer and action: the
+     * products no longer match the action conditions (bought category, first
+     * order, typology…) and must free their slot instead of waiting for expiry.
+     *
+     * @param int[] $productIds
+     */
+    public function expireCycles(int $customerId, int $actionId, array $productIds): void
+    {
+        if ($productIds === []) {
+            return;
+        }
+
+        $this->expireNow(
+            QueryBuilderSuggestionQuery::create()
+                ->filterByCustomerId($customerId)
+                ->filterByActionId($actionId)
+                ->filterByProductId($productIds, Criteria::IN)
+        );
+    }
+
+    private function expireNow(QueryBuilderSuggestionQuery $query): void
     {
         $now = new \DateTime();
 
-        QueryBuilderSuggestionQuery::create()
-            ->filterByActionId($actionId)
+        $query
             ->filterByPurchasedAt(null, Criteria::ISNULL)
             ->filterByExpiresAt($now, Criteria::GREATER_THAN)
             ->update(['ExpiresAt' => $now, 'UpdatedAt' => $now]);
     }
 
     /**
-     * End of the latest cycle of every product ever selected for this action,
-     * active cycles included (their end is in the future).
-     *
-     * @return array<int, string> product id => cycle end (sortable datetime string)
-     */
-    public function getLastCycleEndsByProductId(int $customerId, int $actionId): array
-    {
-        $cycleEnds = [];
-
-        $suggestions = QueryBuilderSuggestionQuery::create()
-            ->filterByCustomerId($customerId)
-            ->filterByActionId($actionId)
-            ->find();
-
-        foreach ($suggestions as $suggestion) {
-            $cycleEnd = $suggestion->getPurchasedAt() ?? $suggestion->getExpiresAt();
-            $cycleEnds[(int) $suggestion->getProductId()] = $cycleEnd?->format('Y-m-d H:i:s') ?? '';
-        }
-
-        return $cycleEnds;
-    }
-
-    /**
-     * Rotation order for the refill: products never selected first (keeping
-     * the eligibility order), then already-cycled products from the oldest
+     * ORDER BY clause of the refill rotation of this action: products never
+     * selected first (no cycle row, NULL sorts first), then from the oldest
      * cycle end — an expired product goes to the back of the queue instead of
-     * being immediately re-selected.
-     *
-     * @param int[] $eligibleProductIds
-     * @param array<int, string> $lastCycleEnds
-     *
-     * @return int[]
+     * being immediately re-selected. One row per (customer, product, action):
+     * the correlated subquery is scalar. Module integers, inlined.
      */
-    public function orderRefillCandidates(array $eligibleProductIds, array $lastCycleEnds): array
+    public function getRotationOrderByExpression(int $customerId, int $actionId): string
     {
-        $fresh = [];
-        $cycled = [];
-
-        foreach ($eligibleProductIds as $productId) {
-            if (isset($lastCycleEnds[$productId])) {
-                $cycled[$productId] = $lastCycleEnds[$productId];
-            } else {
-                $fresh[] = $productId;
-            }
-        }
-
-        asort($cycled);
-
-        return array_merge($fresh, array_keys($cycled));
+        return sprintf(
+            '(SELECT COALESCE(qb_rot.purchased_at, qb_rot.expires_at) FROM query_builder_suggestion qb_rot WHERE qb_rot.customer_id = %d AND qb_rot.action_id = %d AND qb_rot.product_id = `product`.`id`) ASC',
+            $customerId,
+            $actionId
+        );
     }
 
     /** Ends the display cycle of the purchased products (the suggestion dies with the purchase). */

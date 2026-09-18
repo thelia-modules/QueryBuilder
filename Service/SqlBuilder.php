@@ -35,8 +35,14 @@ final readonly class SqlBuilder
     ) {
     }
 
-    /** @param string[] $extraWhere trusted SQL clauses (never user input), may reference runtime placeholders */
-    public function compile(?array $conditionTree, RuntimeContext $runtimeContext, ?int $limit = null, array $extraWhere = []): CompiledQuery
+    /**
+     * @param string[] $extraWhere trusted SQL clauses (never user input), may reference runtime placeholders
+     * @param string[] $orderBy    trusted "expression ASC|DESC" clauses (never user input), may reference
+     *                             runtime placeholders. GROUP BY product.id (not DISTINCT) deduplicates the
+     *                             rows: strict MySQL rejects ORDER BY expressions outside a DISTINCT select
+     *                             list, while correlated subqueries are deterministic per grouped product id
+     */
+    public function compile(?array $conditionTree, RuntimeContext $runtimeContext, ?int $limit = null, array $extraWhere = [], array $orderBy = []): CompiledQuery
     {
         $queryParts = new QueryParts();
 
@@ -52,7 +58,7 @@ final readonly class SqlBuilder
             $queryParts->addWhere($clause);
         }
 
-        $sql = 'SELECT DISTINCT `product`.`id` FROM `product`';
+        $sql = 'SELECT `product`.`id` FROM `product`';
 
         foreach ($queryParts->getJoins() as $joinClause) {
             $sql .= "\n" . $joinClause;
@@ -60,6 +66,12 @@ final readonly class SqlBuilder
 
         if ($queryParts->getWhere() !== []) {
             $sql .= "\nWHERE " . implode("\n  AND ", $queryParts->getWhere());
+        }
+
+        $sql .= "\nGROUP BY `product`.`id`";
+
+        if ($orderBy !== []) {
+            $sql .= "\nORDER BY " . implode(', ', $orderBy);
         }
 
         if ($limit !== null) {
@@ -71,11 +83,12 @@ final readonly class SqlBuilder
 
     /**
      * @param string[] $extraWhere trusted SQL clauses (never user input)
+     * @param string[] $orderBy    trusted "expression ASC|DESC" clauses (never user input)
      * @return int[]
      */
-    public function getProductIds(?array $conditionTree, RuntimeContext $runtimeContext, ?int $limit = null, array $extraWhere = []): array
+    public function getProductIds(?array $conditionTree, RuntimeContext $runtimeContext, ?int $limit = null, array $extraWhere = [], array $orderBy = []): array
     {
-        $compiledQuery = $this->compile($conditionTree, $runtimeContext, $limit, $extraWhere);
+        $compiledQuery = $this->compile($conditionTree, $runtimeContext, $limit, $extraWhere, $orderBy);
 
         $connection = Propel::getConnection();
         $statement = $connection->prepare($compiledQuery->sql);

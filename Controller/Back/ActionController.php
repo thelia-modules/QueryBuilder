@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace QueryBuilder\Controller\Back;
 
+use Propel\Runtime\Propel;
 use QueryBuilder\Action\ActionRegistry;
 use QueryBuilder\Action\ApplyCartDiscountAction;
 use QueryBuilder\Action\ApplyDiscountAction;
 use QueryBuilder\Enum\Context;
 use QueryBuilder\Event\QueryBuilderRulesChangedEvent;
 use QueryBuilder\Form\ActionForm;
+use QueryBuilder\Model\Map\QueryBuilderActionTableMap;
 use QueryBuilder\Model\QueryBuilderAction;
 use QueryBuilder\Model\QueryBuilderActionQuery;
 use QueryBuilder\Model\QueryBuilderRule;
 use QueryBuilder\Model\QueryBuilderRuleQuery;
 use QueryBuilder\QueryBuilder;
+use QueryBuilder\Service\ActionCycleState;
 use QueryBuilder\Service\FieldsBuilder;
 use QueryBuilder\Service\SqlBuilder;
 use QueryBuilder\Service\SuggestionService;
@@ -24,6 +27,8 @@ use Symfony\Component\Routing\Annotation\Route;
 use Thelia\Controller\Admin\BaseAdminController;
 use Thelia\Core\HttpFoundation\Request;
 use Thelia\Core\HttpFoundation\Response;
+use Thelia\Core\Security\AccessManager;
+use Thelia\Core\Security\Resource\AdminResources;
 use Thelia\Core\Template\ParserContext;
 use Thelia\Core\Translation\Translator;
 use Thelia\Form\Exception\FormValidationException;
@@ -41,6 +46,10 @@ class ActionController extends BaseAdminController
         ActionRegistry $actionRegistry,
         EventDispatcherInterface $eventDispatcher,
     ): RedirectResponse|Response {
+        if (null !== $response = $this->checkAuth(AdminResources::MODULE, QueryBuilder::getModuleCode(), AccessManager::CREATE)) {
+            return $response;
+        }
+
         $form = $this->createForm(ActionForm::getName());
 
         try {
@@ -84,6 +93,10 @@ class ActionController extends BaseAdminController
         ActionRegistry $actionRegistry,
         FieldsBuilder $fieldsBuilder,
     ): Response {
+        if (null !== $response = $this->checkAuth(AdminResources::MODULE, QueryBuilder::getModuleCode(), AccessManager::VIEW)) {
+            return $response;
+        }
+
         $rule = QueryBuilderRuleQuery::create()->findOneById($ruleId);
         $action = QueryBuilderActionQuery::create()->filterByRuleId($ruleId)->findOneById($actionId);
 
@@ -142,6 +155,10 @@ class ActionController extends BaseAdminController
         SuggestionService $suggestionService,
         EventDispatcherInterface $eventDispatcher,
     ): RedirectResponse|Response {
+        if (null !== $response = $this->checkAuth(AdminResources::MODULE, QueryBuilder::getModuleCode(), AccessManager::UPDATE)) {
+            return $response;
+        }
+
         $form = $this->createForm(ActionForm::getName());
 
         try {
@@ -160,8 +177,7 @@ class ActionController extends BaseAdminController
                 Context::tryFrom($rule->getContext() ?? '') ?? Context::GLOBAL_SCOPE
             );
             $parameters = $this->buildParameters($action->getParametersArray(), $data);
-            $conditionTreeChanged = $this->normalizeConditionTree($action->getConditionTreeArray())
-                !== $this->normalizeConditionTree($conditionTree);
+            $previousState = ActionCycleState::fromAction($action);
 
             $action
                 ->setName($data['name'])
@@ -171,11 +187,8 @@ class ActionController extends BaseAdminController
                 ->setConditionTree($conditionTree !== null ? json_encode($conditionTree, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE) : null)
                 ->setParameters($parameters !== [] ? json_encode($parameters, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE) : null)
                 ->setActivate($data['activate'] ? 1 : 0);
-            $action->save();
 
-            if ($conditionTreeChanged) {
-                $suggestionService->expireActiveCycles((int) $action->getId());
-            }
+            $this->saveWithCycles($action, $previousState, $suggestionService);
 
             $eventDispatcher->dispatch(new QueryBuilderRulesChangedEvent());
 
@@ -202,13 +215,21 @@ class ActionController extends BaseAdminController
         int $ruleId,
         int $actionId,
         EventDispatcherInterface $eventDispatcher,
+        SuggestionService $suggestionService,
     ): RedirectResponse {
+        if (null !== $response = $this->checkAuth(AdminResources::MODULE, QueryBuilder::getModuleCode(), AccessManager::UPDATE)) {
+            return $response;
+        }
+
         $tokenProvider->checkToken($request->query->get('_token'));
 
         $action = QueryBuilderActionQuery::create()->filterByRuleId($ruleId)->findOneById($actionId);
 
         if ($action !== null) {
-            $action->setActivate($action->getActivate() ? 0 : 1)->save();
+            $previousState = ActionCycleState::fromAction($action);
+            $action->setActivate($previousState->active ? 0 : 1);
+
+            $this->saveWithCycles($action, $previousState, $suggestionService);
             $eventDispatcher->dispatch(new QueryBuilderRulesChangedEvent());
         }
 
@@ -223,6 +244,10 @@ class ActionController extends BaseAdminController
         int $actionId,
         EventDispatcherInterface $eventDispatcher,
     ): RedirectResponse {
+        if (null !== $response = $this->checkAuth(AdminResources::MODULE, QueryBuilder::getModuleCode(), AccessManager::DELETE)) {
+            return $response;
+        }
+
         $tokenProvider->checkToken($request->query->get('_token'));
 
         $action = QueryBuilderActionQuery::create()->filterByRuleId($ruleId)->findOneById($actionId);
@@ -293,33 +318,18 @@ class ActionController extends BaseAdminController
     }
 
     /**
-     * Strips the react-querybuilder bookkeeping (node ids, default valueSource
-     * and "not" flags) so two trees compare on their semantics only: the editor
-     * may re-serialize an unchanged tree with different ids or extra defaults.
+     * The action and the expiry of its invalidated cycles succeed or fail
+     * together: an action saved with cycles still running is the state this
+     * mechanism exists to prevent.
      */
-    private function normalizeConditionTree(?array $tree): ?array
+    private function saveWithCycles(QueryBuilderAction $action, ActionCycleState $previousState, SuggestionService $suggestionService): void
     {
-        if ($tree === null) {
-            return null;
-        }
-
-        unset($tree['id']);
-
-        if (($tree['valueSource'] ?? null) === 'value') {
-            unset($tree['valueSource']);
-        }
-
-        if (empty($tree['not'])) {
-            unset($tree['not']);
-        }
-
-        foreach ($tree as $key => $value) {
-            if (\is_array($value)) {
-                $tree[$key] = $this->normalizeConditionTree($value);
+        Propel::getWriteConnection(QueryBuilderActionTableMap::DATABASE_NAME)->transaction(
+            static function () use ($action, $previousState, $suggestionService): void {
+                $action->save();
+                $suggestionService->expireCyclesInvalidatedBy($previousState, $action);
             }
-        }
-
-        return $tree;
+        );
     }
 
     /**

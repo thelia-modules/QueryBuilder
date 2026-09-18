@@ -35,6 +35,9 @@
 #                     the back-office shows (default: the code). Merging overrides: union by
 #                     code, the last active module wins on the label.
 # disabled: list of field codes to remove
+# disabled_hooks: list of hook codes to remove from every context. The editor no
+#                 longer offers them (and drops them on save); rules already bound
+#                 in database keep resolving front-side.
 
 contexts:
     GLOBAL: []

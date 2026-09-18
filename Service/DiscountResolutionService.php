@@ -30,6 +30,11 @@ use Thelia\Log\Tlog;
  * price holds until the order is placed. Without these parameters the
  * resolution stays stateless, as before.
  *
+ * A limited or persisted action picks its products through ProductSelector
+ * (project ranking, family mixing), without promoted ids: the discounted
+ * products are what is being resolved here, ranking them by "discounted"
+ * would recurse.
+ *
  * Not readonly: results are memoized per (context, products) for the request.
  */
 final class DiscountResolutionService
@@ -49,6 +54,8 @@ final class DiscountResolutionService
         private readonly RuleEngine $ruleEngine,
         private readonly SqlBuilder $sqlBuilder,
         private readonly SuggestionService $suggestionService,
+        private readonly ProductSelector $productSelector,
+        private readonly StickySelectionService $stickySelectionService,
     ) {
     }
 
@@ -170,7 +177,7 @@ final class DiscountResolutionService
         $limit = (int) ($parameters['limit'] ?? ($persistDays > 0 ? self::DEFAULT_STICKY_LIMIT : 0));
 
         if ($persistDays <= 0 && $limit <= 0) {
-            return $this->queryActionProductIds($rule, $action, $runtimeContext, $restrictToIds, null);
+            return $this->queryActionProductIds($rule, $action, $runtimeContext, $restrictToIds);
         }
 
         if ($persistDays > 0 && $runtimeContext->customerId === null) {
@@ -182,7 +189,7 @@ final class DiscountResolutionService
         if (!\array_key_exists($memoKey, $this->memoizedActionProductIds)) {
             $this->memoizedActionProductIds[$memoKey] = $persistDays > 0
                 ? $this->resolveStickyProductIds($rule, $action, $runtimeContext, $limit, $persistDays)
-                : $this->queryActionProductIds($rule, $action, $runtimeContext, null, $limit);
+                : $this->selectActionProductIds($rule, $action, $runtimeContext, $limit);
         }
 
         $actionProductIds = $this->memoizedActionProductIds[$memoKey];
@@ -208,55 +215,30 @@ final class DiscountResolutionService
         int $limit,
         int $persistDays,
     ): ?array {
-        $customerId = (int) $runtimeContext->customerId;
-        $actionId = (int) $action->getId();
+        try {
+            $stickyIds = $this->stickySelectionService->getActiveProductIds($action, $runtimeContext, $limit);
+        } catch (\InvalidArgumentException $exception) {
+            $this->logSkippedAction($rule, $action, $exception);
 
-        $activeIds = $this->suggestionService->getActiveProductIds($customerId, $actionId);
-
-        if ($activeIds !== []) {
-            try {
-                $sellableIds = $this->sqlBuilder->getProductIds(
-                    null,
-                    $runtimeContext,
-                    null,
-                    [sprintf('`product`.`id` IN (%s)', implode(', ', $activeIds))]
-                );
-            } catch (\InvalidArgumentException $exception) {
-                $this->logSkippedAction($rule, $action, $exception);
-
-                return null;
-            }
-
-            $activeIds = array_values(array_intersect($activeIds, $sellableIds));
+            return null;
         }
 
-        $stickyIds = \array_slice($activeIds, 0, $limit);
-        $missing = $limit - \count($stickyIds);
-
-        if ($missing > 0) {
-            $eligibleIds = $this->queryActionProductIds($rule, $action, $runtimeContext, null, null);
-
-            if ($eligibleIds !== null) {
-                $newProductIds = \array_slice(
-                    $this->suggestionService->orderRefillCandidates(
-                        array_values(array_diff($eligibleIds, $stickyIds)),
-                        $this->suggestionService->getLastCycleEndsByProductId($customerId, $actionId)
-                    ),
-                    0,
-                    $missing
-                );
-
-                if ($newProductIds !== []) {
-                    $this->suggestionService->recordSuggestions($customerId, $action, $newProductIds, $persistDays);
-                    $stickyIds = array_merge($stickyIds, $newProductIds);
-                }
-            }
+        //A refill that cannot compile leaves the running discounts untouched
+        try {
+            $stickyIds = $this->stickySelectionService->refill($action, $runtimeContext, $limit, $persistDays, $stickyIds);
+        } catch (\InvalidArgumentException $exception) {
+            $this->logSkippedAction($rule, $action, $exception);
         }
 
         $cartProductIds = array_values(array_intersect($stickyIds, $runtimeContext->cartProductIds));
 
         if ($cartProductIds !== []) {
-            $this->suggestionService->extendCycles($customerId, $actionId, $cartProductIds, $persistDays);
+            $this->suggestionService->extendCycles(
+                (int) $runtimeContext->customerId,
+                (int) $action->getId(),
+                $cartProductIds,
+                $persistDays
+            );
         }
 
         return $stickyIds;
@@ -272,7 +254,6 @@ final class DiscountResolutionService
         QueryBuilderAction $action,
         RuntimeContext $runtimeContext,
         ?array $restrictToIds,
-        ?int $limit,
     ): ?array {
         $extraWhere = $restrictToIds !== null
             ? [sprintf('`product`.`id` IN (%s)', implode(', ', $restrictToIds))]
@@ -282,9 +263,29 @@ final class DiscountResolutionService
             return $this->sqlBuilder->getProductIds(
                 $action->getConditionTreeArray(),
                 $runtimeContext,
-                $limit,
+                null,
                 $extraWhere
             );
+        } catch (\InvalidArgumentException $exception) {
+            $this->logSkippedAction($rule, $action, $exception);
+
+            return null;
+        }
+    }
+
+    /**
+     * Stateless limited action: the best ranked products of the tree, families mixed.
+     *
+     * @return int[]|null null when the condition cannot be compiled for this context
+     */
+    private function selectActionProductIds(
+        QueryBuilderRule $rule,
+        QueryBuilderAction $action,
+        RuntimeContext $runtimeContext,
+        int $limit,
+    ): ?array {
+        try {
+            return $this->productSelector->select($action->getConditionTreeArray(), $runtimeContext, $limit);
         } catch (\InvalidArgumentException $exception) {
             $this->logSkippedAction($rule, $action, $exception);
 

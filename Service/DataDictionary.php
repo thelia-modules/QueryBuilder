@@ -96,6 +96,7 @@ final class DataDictionary
             $raw['joins'] = array_replace($raw['joins'], $override['joins']);
             $raw['fields'] = array_replace($raw['fields'], $override['fields']);
             $raw['disabled'] = array_merge($raw['disabled'], $override['disabled']);
+            $raw['disabled_hooks'] = array_merge($raw['disabled_hooks'], $override['disabled_hooks']);
 
             //Union by hook code, the last module wins on the label (a project
             //override can refine the label of a base hook)
@@ -106,6 +107,16 @@ final class DataDictionary
 
         foreach ($raw['disabled'] as $disabledFieldCode) {
             unset($raw['fields'][$disabledFieldCode]);
+        }
+
+        //A disabled hook leaves the dictionary entirely: no longer offered by the
+        //editor, dropped by the save intersect on the next edit of a bound rule.
+        //Rules still bound in database keep resolving front-side (the RuleEngine
+        //matches raw stored codes) and show the raw code in the back-office list.
+        foreach ($raw['contexts'] as $contextValue => $hooks) {
+            foreach ($raw['disabled_hooks'] as $disabledHookCode) {
+                unset($raw['contexts'][$contextValue][$disabledHookCode]);
+            }
         }
 
         return $this->dictionary = [
@@ -151,6 +162,7 @@ final class DataDictionary
             'fields' => $content['fields'] ?? [],
             'contexts' => $contexts,
             'disabled' => $content['disabled'] ?? [],
+            'disabled_hooks' => $content['disabled_hooks'] ?? [],
         ];
     }
 

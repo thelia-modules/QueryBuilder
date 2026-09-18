@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace QueryBuilder\Command;
 
 use QueryBuilder\Query\RuntimeContext;
+use QueryBuilder\Service\ProductSelector;
 use QueryBuilder\Service\RuntimeContextFactory;
 use QueryBuilder\Service\SqlBuilder;
 use Symfony\Component\Console\Input\InputArgument;
@@ -22,6 +23,7 @@ class CompileCommand extends ContainerAwareCommand
     public function __construct(
         private readonly SqlBuilder $sqlBuilder,
         private readonly RuntimeContextFactory $runtimeContextFactory,
+        private readonly ProductSelector $productSelector,
     ) {
         parent::__construct();
     }
@@ -37,6 +39,7 @@ class CompileCommand extends ContainerAwareCommand
             ->addOption('cart-products', null, InputOption::VALUE_REQUIRED, 'Comma-separated product ids of the cart')
             ->addOption('locale', null, InputOption::VALUE_REQUIRED, 'Locale', 'fr_FR')
             ->addOption('limit', null, InputOption::VALUE_REQUIRED, 'LIMIT applied to the query')
+            ->addOption('ordered', null, InputOption::VALUE_NONE, 'Apply the product ranking (order providers, then product id), without the promoted ids, the rotation nor the family mixing of the selections')
             ->addOption('execute', null, InputOption::VALUE_NONE, 'Execute the query and print the product ids');
     }
 
@@ -68,8 +71,9 @@ class CompileCommand extends ContainerAwareCommand
         ));
 
         $limit = $input->getOption('limit') !== null ? (int) $input->getOption('limit') : null;
+        $orderBy = $input->getOption('ordered') ? $this->productSelector->getOrderBy($runtimeContext) : [];
 
-        $compiledQuery = $this->sqlBuilder->compile($conditionTree, $runtimeContext, $limit);
+        $compiledQuery = $this->sqlBuilder->compile($conditionTree, $runtimeContext, $limit, [], $orderBy);
 
         $output->writeln('<info>SQL</info>');
         $output->writeln($compiledQuery->sql);
@@ -78,7 +82,7 @@ class CompileCommand extends ContainerAwareCommand
         $output->writeln((string) json_encode($compiledQuery->parameters, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE));
 
         if ($input->getOption('execute')) {
-            $productIds = $this->sqlBuilder->getProductIds($conditionTree, $runtimeContext, $limit);
+            $productIds = $this->sqlBuilder->getProductIds($conditionTree, $runtimeContext, $limit, [], $orderBy);
 
             $output->writeln('');
             $output->writeln(sprintf('<info>%d product(s)</info>', \count($productIds)));
