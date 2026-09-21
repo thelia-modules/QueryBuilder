@@ -24,10 +24,12 @@ use QueryBuilder\Query\RuntimeContext;
  *    from a persisted action; defaults limit to 3 when set alone)
  *
  * Unlike display actions, this action is NOT driven by hooks: the discounts
- * are resolved on demand by DiscountResolutionService. The module applies them
- * on the cart lines (CartItemDiscountApplier) and exposes them on the front
- * product resource (QueryBuilderProductOffer addon). execute() is therefore a
- * no-op on hook execution.
+ * are resolved on demand by DiscountResolutionService. The module answers them
+ * through the catalog price contract of the core (DiscountCatalogPriceResolver),
+ * which prices the listings, the product page, the cart lines and the front API
+ * with them, and exposes them on the front product resource
+ * (QueryBuilderProductOffer addon). execute() is therefore a no-op on hook
+ * execution.
  */
 final readonly class ApplyDiscountAction implements ActionInterface
 {

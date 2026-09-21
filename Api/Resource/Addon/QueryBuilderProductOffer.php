@@ -19,8 +19,9 @@ use Thelia\Model\Product as ProductModel;
 /**
  * Exposes on the front product resource the discount an ApplyDiscount rule
  * grants the current visitor on this product (rate, label, stackable flag), for
- * the price badges of a decoupled front. The line price itself is handled in the
- * cart by CartItemDiscountApplier.
+ * the price badges of a decoupled front. The discounted price itself is served
+ * by the core, on the sale elements of the resource, through the catalog price
+ * resolver this module decorates (DiscountCatalogPriceResolver).
  */
 final class QueryBuilderProductOffer implements ResourceAddonInterface
 {
