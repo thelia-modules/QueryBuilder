@@ -22,11 +22,13 @@ class QueryBuilder extends BaseModule
     /** @var string */
     public const DOMAIN_NAME = 'querybuilder';
 
-    public const MINIMUM_CORE_VERSION = '3.0.0';
+    public const MINIMUM_CORE_VERSION = '3.2.0';
 
     /**
      * The <thelia> bound of module.xml is not enforced by every 2.x core: a checkout
      * of this line dropped into a Thelia 2 shop must refuse to activate, with a message.
+     * Thelia 3.2 is the first core to offer the catalog price contract the product
+     * discounts plug into (CatalogPriceResolverInterface).
      */
     public function preActivation(?ConnectionInterface $con = null): bool
     {
