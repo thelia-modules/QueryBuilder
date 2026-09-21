@@ -15,7 +15,7 @@
         <language>en_US</language>
         <language>fr_FR</language>
     </languages>
-    <version>2.0.1</version>
+    <version>2.1.0</version>
     <authors>
         <author>
             <name>Samuel Diakité</name>
@@ -25,6 +25,6 @@
         </author>
     </authors>
     <type>classic</type>
-    <thelia>3.0.0</thelia>
+    <thelia>3.2.0</thelia>
     <stability>beta</stability>
 </module>

@@ -6,7 +6,7 @@ Only the fields of a data dictionary and a closed list of operators are accepted
 
 ## Compatibility
 
-- Thelia 3 (`thelia/core` ^3.0), Flexy front theme, default-twig back-office
+- Thelia 3.2 or later (`thelia/core` ^3.2: the catalog price contract the product discounts plug into), Flexy front theme, default-twig back-office
 - PHP 8.3+
 - `openstudio/query-builder-bundle` ^1.1 (the back-office editor)
 
@@ -94,7 +94,7 @@ The product list is rendered with `templates/frontOffice/default/QueryBuilder/pr
 
 The cart discount granted by a rule is shown on the checkout pages by `cart-discount.html.twig` (same override path), once per request, on the `checkout.top` and `cart.bottom` points.
 
-A product discount shows up wherever the theme prices a product, without any template work: the product page reads its sale elements from the core access service (`PseByProductEvent`) and the listings, the cross-selling strips and the search read them from the front API (`ModelToResourceEvent`); the module answers both with a promotion at the discounted price, so the theme renders its usual struck original price and discounted price. The label of the discount is shown in the `cart-discount.html.twig` fragment above, which lists the labelled product discounts charged on the cart lines with the products they apply to; the product page shows the discounted price only.
+A product discount shows up wherever the theme prices a product, without any template work: the module answers the catalog price contract of the core (`Thelia\Domain\Pricing\CatalogPriceResolverInterface`, see ApplyDiscount below), which every reader of a price goes through, so the theme renders its usual struck original price and discounted price on the product page, in the listings, in the cross-selling strips, in the search and in the cart. The label of the discount is shown in the `cart-discount.html.twig` fragment above, which lists the labelled product discounts charged on the cart lines with the products they apply to; the product page shows the discounted price only.
 
 For a custom rendering, the Twig function returns the same structure as the API:
 
@@ -133,11 +133,13 @@ With `persist_days`, the selection becomes sticky for an identified customer: th
 
 Parameters: `discount_rate` (percentage, required), `discount_label`, `discount_cumulative`, and the optional `limit` and `persist_days` of a sticky selection (an anonymous visitor then gets no discount at all).
 
-The discount applies on the cart lines: at every cart change, customer login or currency change, the module re-reads the catalog prices of each line as the core does and writes the discounted price in the promotion columns of the line. A non-stackable rule (default) replaces a catalog promotion only when it is better; a stackable rule applies on top of it. When the rule stops applying, the line goes back to the catalog prices. The order lines inherit the cart line prices, so the amount is the same in the cart, at payment and on the order.
+The discount is served through the catalog price contract of the core, introduced by Thelia 3.2 for its catalog price rules: the module decorates `Thelia\Domain\Pricing\CatalogPriceResolverInterface` (`DiscountCatalogPriceResolver`) and prices, for the visitor the core names and the cart of the session, the sale elements of the products a discount rule selects; every other sale element keeps the answer of the core. The core then does what it does for its own rules: it substitutes the price for the promo price in the product loops, on the product page, on the front product resources and in the cart lines it settles at every cart change, sign-in and currency change, applies the customer discount and the tax on top, and freezes the line price on the order. The price announced is the price charged, and when the rule stops applying the line goes back to the catalog prices at the next cart refresh.
+
+A non-stackable rule (default) replaces the promotion the visitor would otherwise see, catalog promotion or catalog price rule of the core, only when it is better; a stackable rule applies on top of it. The core asks nothing of the price resolvers while no rule runs: the module also decorates `Thelia\Domain\Pricing\PricingActivityChecker` to declare a running discount rule as a public, visitor-dependent pricing, which makes the core ask and takes the shared API cache of the front product collections out of the way while one runs. The price orders and `min_price` / `max_price` filters of the product loop read the stored prices of the core rules only: they do not see the module discounts, as they do not see the core prices reserved to named customers.
 
 The tree of a discount action is evaluated on every surface, cart events included. Conditions that describe a recommendation ("product in the cart = false") cancel the discount as soon as the product enters the cart: keep the tree of a discount on stable criteria (brand, category, visibility).
 
-The same discount is shown on the product page, in the listings and on the front product resources (`productSaleElements[].promo` and `promoPrice`), computed from the catalog prices of the visit (currency, customer discount) with the same policy as the cart lines, so the price announced is the price charged. The product page resolves the rules with the displayed product as current product; the listings and the API resources without one. The `QueryBuilderProductOffer` addon still exposes the rate and label for a decoupled front. The label is displayed in the cart discount fragment of the checkout pages (see Front).
+The rules are evaluated without a current product on every surface (the core asks for a batch of sale elements, not for a page): a discount rule whose conditions name the context product (`PRODUCT` context) does not price the catalog. The `QueryBuilderProductOffer` addon still exposes the rate and label on the front product resource for a decoupled front. The label is displayed in the cart discount fragment of the checkout pages (see Front).
 
 ### ApplyCartDiscount
 

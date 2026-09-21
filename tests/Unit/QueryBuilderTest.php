@@ -14,17 +14,27 @@ final class QueryBuilderTest extends TestCase
     public function aThelia2CoreIsRefusedAtPreActivationWithAnExplicitMessage(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Thelia 3.0.0 or later');
+        $this->expectExceptionMessage('Thelia 3.2.0 or later');
         $this->expectExceptionMessage('2.5.4');
 
         QueryBuilder::assertSupportedCoreVersion('2.5.4');
     }
 
     #[Test]
-    public function aThelia3CoreIsAccepted(): void
+    public function aThelia3CoreWithoutTheCatalogPriceContractIsRefused(): void
     {
-        QueryBuilder::assertSupportedCoreVersion('3.0.0');
-        QueryBuilder::assertSupportedCoreVersion('3.1.0-beta1');
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Thelia 3.2.0 or later');
+        $this->expectExceptionMessage('3.1.0');
+
+        QueryBuilder::assertSupportedCoreVersion('3.1.0');
+    }
+
+    #[Test]
+    public function aThelia3CoreOfferingTheCatalogPriceContractIsAccepted(): void
+    {
+        QueryBuilder::assertSupportedCoreVersion('3.2.0');
+        QueryBuilder::assertSupportedCoreVersion('3.3.0-beta1');
 
         $this->addToAssertionCount(2);
     }
