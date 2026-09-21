@@ -177,7 +177,8 @@ final readonly class CartDiscountListener implements EventSubscriberInterface
 
     private function getStartedSession(): ?Session
     {
-        $session = $this->requestStack->getCurrentRequest()?->getSession();
+        $request = $this->requestStack->getCurrentRequest();
+        $session = $request?->hasSession() ? $request->getSession() : null;
 
         return $session instanceof Session && $session->isStarted() ? $session : null;
     }

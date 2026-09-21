@@ -7,23 +7,28 @@ namespace QueryBuilder\Service;
 use QueryBuilder\Query\RuntimeContext;
 use QueryBuilder\Query\RuntimeParameterProviderInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Thelia\Core\HttpFoundation\Session\Session;
 use Thelia\Model\Cart;
+use Thelia\Model\CartQuery;
 use Thelia\Model\Lang;
 
 /**
  * Builds the RuntimeContext of the current front visit (customer, cart,
  * locale, cart total, delivery country) then lets the registered providers add
  * their project-specific placeholders.
+ *
+ * The cart of a visit is read by the id the session holds, never restored: a
+ * restore creates and saves a cart, which a read of a price or of a product
+ * resource must not do, and it fails on a request of the stateless API. A visit
+ * whose session names no cart is priced as an empty cart. The core restores the
+ * cart itself on every page that shows it, so the id is there whenever a cart is.
  */
 final readonly class RuntimeContextFactory
 {
     /** @param iterable<RuntimeParameterProviderInterface> $parameterProviders */
     public function __construct(
         private RequestStack $requestStack,
-        private EventDispatcherInterface $eventDispatcher,
         private DeliveryCountryResolver $deliveryCountryResolver,
         #[AutowireIterator(RuntimeParameterProviderInterface::TAG)]
         private iterable $parameterProviders = [],
@@ -36,9 +41,9 @@ final readonly class RuntimeContextFactory
         ?int $categoryId = null,
         ?int $brandId = null,
     ): RuntimeContext {
-        $session = $this->requestStack->getCurrentRequest()?->getSession();
-        $customer = $session instanceof Session ? $session->getCustomerUser() : null;
-        $cart = $session instanceof Session ? $session->getSessionCart($this->eventDispatcher) : null;
+        $session = $this->currentSession();
+        $customer = $session?->getCustomerUser();
+        $cart = $this->sessionCartWithoutRestore($session);
         $country = $this->deliveryCountryResolver->resolve($cart);
 
         return $this->withProviderParameters(new RuntimeContext(
@@ -49,8 +54,8 @@ final readonly class RuntimeContextFactory
             orderId: $orderId,
             categoryId: $categoryId,
             brandId: $brandId,
-            locale: $session instanceof Session ? ($session->getLang()?->getLocale() ?? 'fr_FR') : 'fr_FR',
-            cartTotal: $cart?->getTaxedAmount($country, false),
+            locale: $session?->getLang()?->getLocale() ?? 'fr_FR',
+            cartTotal: $cart?->getTaxedAmount($country, false) ?? 0.0,
             deliveryCountryId: (int) $country->getId(),
         ));
     }
@@ -61,8 +66,7 @@ final readonly class RuntimeContextFactory
      */
     public function forCart(Cart $cart): RuntimeContext
     {
-        $session = $this->requestStack->getCurrentRequest()?->getSession();
-        $locale = $session instanceof Session ? $session->getLang()?->getLocale() : null;
+        $locale = $this->currentSession()?->getLang()?->getLocale();
         $country = $this->deliveryCountryResolver->resolve($cart);
 
         return $this->withProviderParameters(new RuntimeContext(
@@ -100,6 +104,31 @@ final readonly class RuntimeContextFactory
             deliveryCountryId: $baseContext->deliveryCountryId,
             parameters: array_merge($parameters, $baseContext->parameters),
         );
+    }
+
+    /**
+     * The session of the current request, when it has one: a request of the
+     * stateless API carries none, and asking it for one throws.
+     */
+    private function currentSession(): ?Session
+    {
+        $request = $this->requestStack->getCurrentRequest();
+        $session = $request?->hasSession() ? $request->getSession() : null;
+
+        return $session instanceof Session ? $session : null;
+    }
+
+    private function sessionCartWithoutRestore(?Session $session): ?Cart
+    {
+        $cartId = $session?->get(Session::SESSION_CART_ID_NAME);
+
+        if ($cartId === null) {
+            return null;
+        }
+
+        $cart = CartQuery::create()->findPk((int) $cartId);
+
+        return $cart !== null && !$cart->isDeleted() ? $cart : null;
     }
 
     /** @return int[] */
