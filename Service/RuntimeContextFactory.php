@@ -11,6 +11,7 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use Thelia\Core\HttpFoundation\Session\Session;
 use Thelia\Model\Cart;
 use Thelia\Model\CartQuery;
+use Thelia\Model\Customer;
 use Thelia\Model\Lang;
 
 /**
@@ -79,6 +80,28 @@ final readonly class RuntimeContextFactory
         ));
     }
 
+    /**
+     * Context of a visitor the core names (catalog price resolution): the given
+     * customer, and the cart of an already started session. The session is not
+     * started from here: the core asks for prices on stateless API requests too,
+     * and the core settles the prices of a cart while it restores it.
+     */
+    public function forVisitor(?Customer $customer): RuntimeContext
+    {
+        $session = $this->startedSession();
+        $cart = $this->sessionCartWithoutRestore($session);
+        $country = $this->deliveryCountryResolver->resolve($cart);
+
+        return $this->withProviderParameters(new RuntimeContext(
+            customerId: $customer?->getId() !== null ? (int) $customer->getId() : null,
+            cartId: $cart?->getId() !== null ? (int) $cart->getId() : null,
+            cartProductIds: $cart !== null ? $this->cartProductIds($cart) : [],
+            locale: $session?->getLang()?->getLocale() ?? Lang::getDefaultLanguage()->getLocale(),
+            cartTotal: $cart?->getTaxedAmount($country, false) ?? 0.0,
+            deliveryCountryId: (int) $country->getId(),
+        ));
+    }
+
     /** Applies the registered project providers to an already built context. */
     public function withProviderParameters(RuntimeContext $baseContext): RuntimeContext
     {
@@ -116,6 +139,13 @@ final readonly class RuntimeContextFactory
         $session = $request?->hasSession() ? $request->getSession() : null;
 
         return $session instanceof Session ? $session : null;
+    }
+
+    private function startedSession(): ?Session
+    {
+        $session = $this->currentSession();
+
+        return $session?->isStarted() ? $session : null;
     }
 
     private function sessionCartWithoutRestore(?Session $session): ?Cart
