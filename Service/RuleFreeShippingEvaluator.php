@@ -40,7 +40,8 @@ final class RuleFreeShippingEvaluator extends CouponFreeShippingEvaluator
         }
 
         try {
-            $session = $this->requestStack->getCurrentRequest()?->getSession();
+            $request = $this->requestStack->getCurrentRequest();
+            $session = $request?->hasSession() ? $request->getSession() : null;
 
             if (!$session instanceof Session || !$session->isStarted()) {
                 return false;

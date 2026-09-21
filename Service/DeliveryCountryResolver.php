@@ -30,7 +30,9 @@ final readonly class DeliveryCountryResolver
             return $country;
         }
 
-        $session = $this->requestStack->getCurrentRequest()?->getSession();
+        //A request of the stateless API carries no session, and asking it for one throws
+        $request = $this->requestStack->getCurrentRequest();
+        $session = $request?->hasSession() ? $request->getSession() : null;
         $deliveryAddressId = $session instanceof Session && $session->isStarted()
             ? $session->getOrder()?->getChoosenDeliveryAddress()
             : null;

@@ -51,7 +51,8 @@ final class CartDiscountThemeHook implements ThemeHookInterface
             return '';
         }
 
-        $session = $this->requestStack->getCurrentRequest()?->getSession();
+        $request = $this->requestStack->getCurrentRequest();
+        $session = $request?->hasSession() ? $request->getSession() : null;
 
         if (!$session instanceof Session || !$session->isStarted()) {
             return '';
