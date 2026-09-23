@@ -120,6 +120,17 @@ source du classement :
    famille n'est déjà présente (familles des produits déjà engagés dans le
    bloc comprises) ; si tous les candidats répètent une famille présente, le
    mieux classé est pris quand même plutôt que de laisser la place vide.
+3. **Frontière de groupe** (`ProductGroupProviderInterface`, projet) : la
+   recherche d'une famille nouvelle ne regarde que les candidats du même
+   groupe que le meilleur candidat restant. Un groupe qui a encore des
+   candidats n'est jamais sauté au profit d'une famille nouvelle d'un groupe
+   suivant : panachage dans le groupe, repli famille répétée dans le groupe,
+   puis seulement le groupe suivant. Exemple : produits de la sélection métier
+   du client d'abord, le reste du catalogue quand elle est épuisée. Le groupe
+   doit regrouper le critère de tri dominant (un mieux classé n'appartient
+   jamais à un groupe « suivant »). Sans provider, un seul groupe, panachage
+   non borné. Les produits déjà engagés comptent pour les familles présentes,
+   pas pour le groupe.
 
 Le classement ne s'applique **jamais** dans `SqlBuilder::compile()` seul ni dans
 un scope : l'éligibilité des règles et les requêtes brutes restent non triées.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace QueryBuilder\Service;
 
 use QueryBuilder\Query\ProductFamilyProviderInterface;
+use QueryBuilder\Query\ProductGroupProviderInterface;
 use QueryBuilder\Query\RuntimeContext;
 use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
 
@@ -25,16 +26,31 @@ use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
  * rather than leaving the slot empty. The candidates are therefore fetched
  * without SQL LIMIT: the mixing needs the whole ranked pool (ids only, a few
  * hundred rows on a catalog of this size), the count applies after it.
+ *
+ * Group boundary, resolved in PHP as well: the search for a new family only
+ * considers the candidates of the same group (ProductGroupProviderInterface)
+ * as the best ranked remaining candidate. A group still holding candidates is
+ * never skipped for the sake of family diversity: the mixing runs inside the
+ * group, the fallback repeats a family inside the group, and the next group is
+ * served only once the previous one is exhausted. Without group provider every
+ * candidate shares the default group and the mixing is unbounded.
  */
 final readonly class ProductSelector
 {
-    /** @param iterable<ProductFamilyProviderInterface> $familyProviders */
+    private const DEFAULT_GROUP_KEY = '';
+
+    /**
+     * @param iterable<ProductFamilyProviderInterface> $familyProviders
+     * @param iterable<ProductGroupProviderInterface>  $groupProviders
+     */
     public function __construct(
         private SqlBuilder $sqlBuilder,
         private ProductOrderResolver $productOrderResolver,
         private SuggestionService $suggestionService,
         #[TaggedIterator(ProductFamilyProviderInterface::TAG)]
         private iterable $familyProviders = [],
+        #[TaggedIterator(ProductGroupProviderInterface::TAG)]
+        private iterable $groupProviders = [],
     ) {
     }
 
@@ -148,6 +164,11 @@ final readonly class ProductSelector
             return \array_slice($rankedCandidateIds, 0, $count);
         }
 
+        //The engaged products count for the families present, never for the
+        //group: a running cycle filled before a boundary change keeps its
+        //products, only the free slots follow the boundary
+        $groupKeyByProductId = $this->resolveGroupKeys($rankedCandidateIds, $runtimeContext);
+
         $presentFamilyKeys = [];
 
         foreach ($engagedProductIds as $productId) {
@@ -158,7 +179,8 @@ final readonly class ProductSelector
         $remainingIds = $rankedCandidateIds;
 
         while (\count($selectedIds) < $count && $remainingIds !== []) {
-            $index = $this->findFirstOutsidePresentFamilies($remainingIds, $familyKeysByProductId, $presentFamilyKeys) ?? 0;
+            $groupKey = $groupKeyByProductId[$remainingIds[0]] ?? self::DEFAULT_GROUP_KEY;
+            $index = $this->findFirstOutsidePresentFamilies($remainingIds, $familyKeysByProductId, $presentFamilyKeys, $groupKeyByProductId, $groupKey) ?? 0;
             $productId = $remainingIds[$index];
 
             unset($remainingIds[$index]);
@@ -172,13 +194,27 @@ final readonly class ProductSelector
     }
 
     /**
-     * @param int[]                     $rankedIds
-     * @param array<int, list<string>>  $familyKeysByProductId
-     * @param array<string, true>       $presentFamilyKeys
+     * Index, in $rankedIds, of the best candidate of the given group whose
+     * families are all absent from the block. One pass over the whole ranked
+     * list (no pre-filtering): the index stays valid for the caller's unset().
+     *
+     * @param int[]                    $rankedIds
+     * @param array<int, list<string>> $familyKeysByProductId
+     * @param array<string, true>      $presentFamilyKeys
+     * @param array<int, string>       $groupKeyByProductId
      */
-    private function findFirstOutsidePresentFamilies(array $rankedIds, array $familyKeysByProductId, array $presentFamilyKeys): ?int
-    {
+    private function findFirstOutsidePresentFamilies(
+        array $rankedIds,
+        array $familyKeysByProductId,
+        array $presentFamilyKeys,
+        array $groupKeyByProductId,
+        string $groupKey,
+    ): ?int {
         foreach ($rankedIds as $index => $productId) {
+            if (($groupKeyByProductId[$productId] ?? self::DEFAULT_GROUP_KEY) !== $groupKey) {
+                continue;
+            }
+
             foreach ($familyKeysByProductId[$productId] ?? [] as $familyKey) {
                 if (isset($presentFamilyKeys[$familyKey])) {
                     continue 2;
@@ -189,6 +225,36 @@ final readonly class ProductSelector
         }
 
         return null;
+    }
+
+    /**
+     * @param int[] $productIds
+     *
+     * @return array<int, string> composite key by product id (provider class
+     *                            prefixed, providers joined in service order):
+     *                            two products share a group only when every
+     *                            provider agrees
+     */
+    private function resolveGroupKeys(array $productIds, RuntimeContext $runtimeContext): array
+    {
+        $productIds = array_values(array_unique(array_map(intval(...), $productIds)));
+
+        if ($productIds === []) {
+            return [];
+        }
+
+        $groupKeyByProductId = [];
+
+        foreach ($this->groupProviders as $groupProvider) {
+            $providerKeys = $groupProvider->getGroupKeyByProductId($productIds, $runtimeContext);
+
+            foreach ($productIds as $productId) {
+                $groupKeyByProductId[$productId] = ($groupKeyByProductId[$productId] ?? self::DEFAULT_GROUP_KEY)
+                    . '|' . $groupProvider::class . ':' . ($providerKeys[$productId] ?? self::DEFAULT_GROUP_KEY);
+            }
+        }
+
+        return $groupKeyByProductId;
     }
 
     /**
