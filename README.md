@@ -41,6 +41,21 @@ bindé à la sentinelle `0` hors fiche produit, si bien que « Est le produit de
 la fiche courante » reste exécutable partout — `= faux` laisse tout passer,
 `= vrai` ne matche rien.
 
+Les opérateurs négatifs (`!=`, `notIn`, `doesNotContain`, `notBetween`) sur un
+champ scalaire **conservent les lignes sans valeur** : ils compilent en
+`(champ IS NULL OR champ NOT IN (...))`, parce qu'en SQL `NULL NOT IN (...)`
+vaut inconnu et ferait tomber en silence les produits (ou les clients, via une
+expression corrélée) dont la valeur manque. « Typologie du client pas parmi
+[LAD, GMS…] » cible donc bien les clients sans typologie, comme le promet son
+libellé. Pour exclure explicitement les valeurs manquantes, ajouter une
+condition `notNull`. Portée exacte de cette garantie : une colonne de `product`
+ou une `expression` corrélée. Un `field:` atteint par une jointure INNER dont
+la ligne n'existe pas pour chaque produit (ex. `product_brand_title` : un
+produit sans marque sort du jeu de résultat avant le WHERE) reste exclu, comme
+avant ; ne pas promettre « vide = … » dans le libellé d'un tel champ. Les
+champs multivalués (jointure 1-N) compilent leurs négations en `NOT EXISTS` et
+ne sont pas concernés.
+
 Une `expression` peut contenir le token **`:value`** : la valeur saisie dans
 l'éditeur est alors injectée dans l'expression (un placeholder bindé par
 élément) au lieu de lui être comparée. Le champ doit restreindre ses
