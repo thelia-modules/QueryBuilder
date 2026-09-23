@@ -101,6 +101,9 @@ utilisateur.
   des produits sélectionnés (ex : classement par typologie de client) ;
 - `QueryBuilder\Query\ProductFamilyProviderInterface` — la notion projet de
   « famille » d'un produit (ex : niveau 2 de l'arbre catalogue), pour le panachage ;
+- `QueryBuilder\Query\ProductGroupProviderInterface` — la notion projet de
+  « groupe » d'un produit, pour borner le panachage (ex : sélection métier du
+  client servie avant le reste du catalogue) ;
 - `QueryBuilder\Action\ActionInterface` — nouvelle action prédéfinie
   (`DisplayProductsList` et `ApplyDiscount` sont fournies).
 
