@@ -422,7 +422,6 @@ final readonly class SqlBuilder
             case 'notNull':
                 return $leftHandSide . ' IS NOT NULL';
             case '=':
-            case '!=':
             case '<':
             case '<=':
             case '>':
@@ -430,17 +429,27 @@ final readonly class SqlBuilder
                 return sprintf(
                     '%s %s %s',
                     $leftHandSide,
-                    $operator === '!=' ? '<>' : $operator,
+                    $operator,
                     $queryParts->bindValue($this->normalizeValue($value, $field))
                 );
-            case 'contains':
-            case 'doesNotContain':
-                return sprintf(
-                    '%s %s %s',
+            case '!=':
+                return $this->keepingNull($leftHandSide, sprintf(
+                    '%s <> %s',
                     $leftHandSide,
-                    $operator === 'contains' ? 'LIKE' : 'NOT LIKE',
+                    $queryParts->bindValue($this->normalizeValue($value, $field))
+                ));
+            case 'contains':
+                return sprintf(
+                    '%s LIKE %s',
+                    $leftHandSide,
                     $queryParts->bindValue('%' . $this->escapeLikeValue($value) . '%')
                 );
+            case 'doesNotContain':
+                return $this->keepingNull($leftHandSide, sprintf(
+                    '%s NOT LIKE %s',
+                    $leftHandSide,
+                    $queryParts->bindValue('%' . $this->escapeLikeValue($value) . '%')
+                ));
             case 'beginsWith':
                 return $leftHandSide . ' LIKE ' . $queryParts->bindValue($this->escapeLikeValue($value) . '%');
             case 'endsWith':
@@ -449,13 +458,15 @@ final readonly class SqlBuilder
             case 'notBetween':
                 [$lower, $upper] = $this->normalizeRange($value, $field);
 
-                return sprintf(
+                $comparison = sprintf(
                     '%s %s %s AND %s',
                     $leftHandSide,
                     $operator === 'between' ? 'BETWEEN' : 'NOT BETWEEN',
                     $queryParts->bindValue($lower),
                     $queryParts->bindValue($upper)
                 );
+
+                return $operator === 'between' ? $comparison : $this->keepingNull($leftHandSide, $comparison);
             case 'in':
             case 'notIn':
                 $placeholders = array_map(
@@ -467,15 +478,34 @@ final readonly class SqlBuilder
                     return $operator === 'in' ? '1=0' : '1=1';
                 }
 
-                return sprintf(
+                $comparison = sprintf(
                     '%s %s (%s)',
                     $leftHandSide,
                     $operator === 'in' ? 'IN' : 'NOT IN',
                     implode(', ', $placeholders)
                 );
+
+                return $operator === 'in' ? $comparison : $this->keepingNull($leftHandSide, $comparison);
             default:
                 throw new \InvalidArgumentException(sprintf('QueryBuilder: unsupported operator "%s".', $operator));
         }
+    }
+
+    /**
+     * A negative comparison keeps the rows without a value: in SQL, "NULL NOT
+     * IN (...)" and "NULL <> x" are unknown, so « tous sauf X » would silently
+     * drop the products (or the customers, through a correlated expression)
+     * whose value is missing — the opposite of what the dictionary labels
+     * promise (« vide = client connecté sans typologie »). Holds for a
+     * product column or a correlated expression only: a column reached through
+     * an INNER join with no row for the product (brand of a brandless product)
+     * left the result set before the WHERE. The multivalued path compiles the
+     * positive form inside NOT EXISTS and never reaches here with a negative
+     * operator.
+     */
+    private function keepingNull(string $leftHandSide, string $comparison): string
+    {
+        return sprintf('(%s IS NULL OR %s)', $leftHandSide, $comparison);
     }
 
     private function normalizeValue(mixed $value, FieldDefinition $field): int|float|string
