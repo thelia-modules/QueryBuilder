@@ -4,6 +4,11 @@ All notable changes to this module are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the module adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] 2026-09-24
+
+### Fixed
+- Saving a rule or an action whose tree holds a "list of values" pick on a `:value` field (`product_default_category`, `cart_has_brand`, `cart_has_category`, `context_product_shared_feature_value`) failed with `operator "=" is not allowed for field`. The editor stores that pick as the `=` it stands for, and the compiler only accepted `in` and `notIn` on these fields: an equality on a `:value` expression now compiles as a one-item `in`, `!=` as a one-item `notIn`, each accepted when its inclusion is declared. Such a field may also declare `=` and `!=` outright.
+
 ## [2.0.0] 2026-09-16
 
 Port of the module to Thelia 3. The Thelia 2 line (1.0.0 to 1.2.0) lived in the project the module was written for and is not published.
@@ -44,4 +49,5 @@ Port of the module to Thelia 3. The Thelia 2 line (1.0.0 to 1.2.0) lived in the 
 - The `/query_builder/products/{hookCode}` Symfony route, replaced by the API Platform resource.
 - The `product.top` and `product.bottom` `BaseHook` front hooks, replaced by the theme hook implementation.
 
+[2.0.1]: https://github.com/thelia-modules/QueryBuilder/releases/tag/2.0.1
 [2.0.0]: https://github.com/thelia-modules/QueryBuilder/releases/tag/2.0.0

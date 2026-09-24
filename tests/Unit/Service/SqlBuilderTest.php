@@ -25,6 +25,15 @@ final class SqlBuilderTest extends TestCase
                 label: "Category already bought"
                 expression: "product.id IN (SELECT p.id FROM product p WHERE p.ref IN (:value))"
                 operators: [in, notIn]
+            bought_brand:
+                label: "Brand already bought"
+                expression: "product.brand_id IN (:value)"
+                type: number
+                operators: [notIn]
+            bought_ref:
+                label: "Reference already bought"
+                expression: "product.ref IN (:value)"
+                operators: ['=', '!=']
             selection_only:
                 label: "Selection only"
                 field: product.ref
@@ -240,6 +249,50 @@ final class SqlBuilderTest extends TestCase
 
         $emptyExcluded = $builder->compile(self::rule('bought_category', 'notIn', []), new RuntimeContext());
         self::assertStringContainsString('WHERE (1=1)', $emptyExcluded->sql, 'an empty list excludes nothing');
+    }
+
+    #[Test]
+    public function anEqualityOnAValueExpressionIsAOneItemInclusion(): void
+    {
+        $builder = $this->builder(DictionaryFactory::withOverrides(self::PROJECT_OVERRIDE));
+
+        //The "list of values" pick of the editor is stored as the equality it stands for
+        $kept = $builder->compile(self::rule('bought_category', '=', 'A'), new RuntimeContext());
+        self::assertStringContainsString('WHERE ((product.id IN (SELECT p.id FROM product p WHERE p.ref IN (:qb_0))))', $kept->sql);
+        self::assertSame(['qb_0' => 'A'], $kept->parameters);
+
+        $excluded = $builder->compile(self::rule('bought_category', '!=', 'A'), new RuntimeContext());
+        self::assertStringContainsString('WHERE (NOT (product.id IN (SELECT p.id FROM product p WHERE p.ref IN (:qb_0))))', $excluded->sql);
+        self::assertSame(['qb_0' => 'A'], $excluded->parameters);
+    }
+
+    #[Test]
+    public function anEqualityOnAValueExpressionFollowsTheDeclaredPolarities(): void
+    {
+        $builder = $this->builder(DictionaryFactory::withOverrides(self::PROJECT_OVERRIDE));
+
+        $excluded = $builder->compile(self::rule('bought_brand', '!=', '3'), new RuntimeContext());
+        self::assertStringContainsString('WHERE (NOT (product.brand_id IN (:qb_0)))', $excluded->sql);
+        self::assertSame(['qb_0' => 3], $excluded->parameters);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('operator "=" is not allowed for field "bought_brand"');
+
+        $builder->compile(self::rule('bought_brand', '=', '3'), new RuntimeContext());
+    }
+
+    #[Test]
+    public function aValueExpressionMayDeclareTheEqualitiesOutright(): void
+    {
+        $builder = $this->builder(DictionaryFactory::withOverrides(self::PROJECT_OVERRIDE));
+
+        $kept = $builder->compile(self::rule('bought_ref', '=', 'A'), new RuntimeContext());
+        self::assertStringContainsString('WHERE ((product.ref IN (:qb_0)))', $kept->sql);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('operator "in" is not allowed for field "bought_ref"');
+
+        $builder->compile(self::rule('bought_ref', 'in', ['A']), new RuntimeContext());
     }
 
     private function builder(?DataDictionary $dictionary = null): SqlBuilder

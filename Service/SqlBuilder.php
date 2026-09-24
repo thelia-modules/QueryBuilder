@@ -178,7 +178,7 @@ final readonly class SqlBuilder
 
         $operator = (string) ($rule['operator'] ?? '');
 
-        if (!\in_array($operator, Operators::forField($field), true)) {
+        if (!Operators::isAllowed($field, $operator)) {
             throw new \InvalidArgumentException(sprintf(
                 'QueryBuilder: operator "%s" is not allowed for field "%s".',
                 $operator,
@@ -191,7 +191,7 @@ final readonly class SqlBuilder
         }
 
         if ($field->usesValuePlaceholder()) {
-            return $this->compileValueInExpression($field, $operator, $rule['value'] ?? null, $queryParts);
+            return $this->compileValueInExpression($field, Operators::forValueExpression($operator), $rule['value'] ?? null, $queryParts);
         }
 
         return $this->compileComparison(
@@ -290,7 +290,8 @@ final readonly class SqlBuilder
     /**
      * A :value expression consumes the entered list itself (expanded to one
      * bound placeholder per item), the operator only selecting the polarity:
-     * "in" keeps the products matching the expression, "notIn" the others.
+     * "in" keeps the products matching the expression, "notIn" the others. An
+     * equality reaches here already folded into its inclusion, a single item.
      */
     private function compileValueInExpression(
         FieldDefinition $field,
