@@ -69,7 +69,7 @@ Two kinds of fields:
 
 Runtime placeholders: `:customer_id`, `:cart_id`, `:cart_product_ids`, `:product_id` (bound to 0 outside a product page, so "is the current product = false" lets everything through), `:order_id`, `:category_id`, `:brand_id`, `:locale`, `:cart_total` (products total of the cart, taxes included) and `:delivery_country_id`, plus the ones provided by the project through `RuntimeParameterProviderInterface`. A placeholder without a value in the current visit (an anonymous visitor on a rule that needs `:customer_id`, for instance) makes the rule skip with a logged warning, and the page renders anyway.
 
-An expression may contain the `:value` token: the value entered in the editor is then expanded inside the expression, one placeholder per item, and the field must restrict its `operators` to `in` and `notIn`, which only set the polarity.
+An expression may contain the `:value` token: the value entered in the editor is then expanded inside the expression, one placeholder per item, and the field must restrict its `operators` to `in` and `notIn`, which only set the polarity, or to `=` and `!=`, compiled as a one-item `in` and `notIn`. The "list of values" pick of a field with a `values_query` is stored as `=`, so such a field needs no more than `[in, notIn]` for the pick to compile.
 
 Field types: `text`, `number`, `date`, `datetime` (entered as a date, compared on `DATE()`), `boolean`. A field may declare `values_query` (a `value` column, an optional `label` column, `:locale` allowed): the editor then offers a "list of values" select next to the free operators. Beyond 300 rows or on SQL error the field falls back to the free input. Labels of fields and hooks are translation keys of the `querybuilder` domain.
 

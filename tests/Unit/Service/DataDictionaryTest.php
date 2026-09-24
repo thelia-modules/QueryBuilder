@@ -193,7 +193,11 @@ final class DataDictionaryTest extends TestCase
         ];
         yield ':value expression without polarity operators' => [
             "fields:\n    broken:\n        expression: \"product.id IN (:value)\"\n",
-            'its "operators" must be declared among [in, notIn]',
+            'its "operators" must be declared among [in, notIn, =, !=]',
+        ];
+        yield ':value expression with a free operator' => [
+            "fields:\n    broken:\n        expression: \"product.id IN (:value)\"\n        operators: [in, contains]\n",
+            'its "operators" must be declared among [in, notIn, =, !=]',
         ];
         yield 'join without a source column' => [
             "joins:\n    broken_table:\n        to: id\n",

@@ -17,6 +17,8 @@ use Symfony\Component\Yaml\Yaml;
 final class DataDictionary
 {
     public const DICTIONARY_FILENAME = 'query_builder.yml';
+    //The operators a :value expression may declare: the polarities and the equalities Operators folds into them
+    private const VALUE_EXPRESSION_OPERATORS = ['in', 'notIn', '=', '!='];
 
     private ?array $dictionary = null;
 
@@ -249,13 +251,15 @@ final class DataDictionary
             );
 
             //A :value expression consumes the entered value itself: the field must
-            //restrict its operators to in/notIn so the comparison path never applies
+            //restrict its operators to the polarities (in/notIn) and the equalities
+            //folded into them (=/!=) so the comparison path never applies
             if ($field->usesValuePlaceholder()
-                && ($field->operators === null || $field->operators === [] || array_diff($field->operators, ['in', 'notIn']) !== [])
+                && ($field->operators === null || $field->operators === [] || array_diff($field->operators, self::VALUE_EXPRESSION_OPERATORS) !== [])
             ) {
                 throw new \InvalidArgumentException(sprintf(
-                    'QueryBuilder dictionary: field "%s" uses the :value placeholder, its "operators" must be declared among [in, notIn].',
-                    $code
+                    'QueryBuilder dictionary: field "%s" uses the :value placeholder, its "operators" must be declared among [%s].',
+                    $code,
+                    implode(', ', self::VALUE_EXPRESSION_OPERATORS)
                 ));
             }
 
