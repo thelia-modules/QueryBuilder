@@ -4,6 +4,27 @@ All notable changes to this module are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the module adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] 2026-09-24
+
+Product discounts served through the catalog price contract of the core. Requires Thelia 3.2.
+
+### Added
+- The module decorates `Thelia\Domain\Pricing\CatalogPriceResolverInterface` (`DiscountCatalogPriceResolver`): the sale elements of the products an ApplyDiscount rule selects are priced for the visitor the core names, and the core substitutes the price everywhere it prices a sale element (product loops, product page, front product resources, cart lines), applies the customer discount and the tax on top, and freezes the line price on the order.
+- The module decorates `Thelia\Domain\Pricing\PricingActivityChecker` (`DiscountPricingActivityChecker`): a running discount rule counts as a public, visitor-dependent pricing, so the core asks the resolver and the shared API cache of the front product collections steps aside while one runs.
+- Stackable and non-stackable policies measured against a catalog price rule of the core as they are against a catalog promotion: a non-stackable rule replaces the core rule price only when it is better, a stackable rule applies on top of it and follows its end date.
+
+### Changed
+- Requires Thelia 3.2 (`thelia/core` ^3.2, `<thelia>3.2.0</thelia>`); activation is refused on an older core with the message naming the required version.
+- The cart discount fragment names the product discount charged on a line by recomputing what the core wrote from it (the module price, then the customer discount) instead of comparing the line with the module's own writing.
+- The rules of a discount are evaluated without a current product on every surface: the core asks for a batch of sale elements, never for a page.
+
+### Fixed
+- A request of the stateless API (no session cookie) no longer fails on a product read: the `QueryBuilderProductOffer` addon and the query builder products endpoint asked the session for the cart and restored it, which created a cart and threw without a session. The runtime context now reads the cart the session names, never restores one, and treats a visit without cart as an empty cart; every session access of the module is guarded the way the core guards its own.
+
+### Removed
+- The `PseByProductEvent` and `ModelToResourceEvent` listeners that showed the discount on the product page and on the front product resources, and the cart listener that wrote the discounted price on the cart lines at every cart event: the core does all three from the decorated resolver. Kept, they would stack a stackable discount twice and hand a line priced by a catalog price rule of the core back to the catalog.
+- `QueryBuilder\Api\FrontRead`, which only the removed resource listener used.
+
 ## [2.0.1] 2026-09-24
 
 ### Fixed
@@ -49,5 +70,6 @@ Port of the module to Thelia 3. The Thelia 2 line (1.0.0 to 1.2.0) lived in the 
 - The `/query_builder/products/{hookCode}` Symfony route, replaced by the API Platform resource.
 - The `product.top` and `product.bottom` `BaseHook` front hooks, replaced by the theme hook implementation.
 
+[2.1.0]: https://github.com/thelia-modules/QueryBuilder/releases/tag/2.1.0
 [2.0.1]: https://github.com/thelia-modules/QueryBuilder/releases/tag/2.0.1
 [2.0.0]: https://github.com/thelia-modules/QueryBuilder/releases/tag/2.0.0

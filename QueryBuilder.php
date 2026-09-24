@@ -7,6 +7,7 @@ namespace QueryBuilder;
 use OpenStudio\QueryBuilderBundle\Form\QueryBuilderType;
 use OpenStudio\QueryBuilderBundle\Service\FormOptionsNormalizer;
 use Propel\Runtime\Connection\ConnectionInterface;
+use QueryBuilder\Service\DiscountCatalogPriceResolver;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
 use Symfony\Component\Finder\Finder;
 use Thelia\Core\Install\Database;
@@ -21,11 +22,13 @@ class QueryBuilder extends BaseModule
     /** @var string */
     public const DOMAIN_NAME = 'querybuilder';
 
-    public const MINIMUM_CORE_VERSION = '3.0.0';
+    public const MINIMUM_CORE_VERSION = '3.2.0';
 
     /**
      * The <thelia> bound of module.xml is not enforced by every 2.x core: a checkout
      * of this line dropped into a Thelia 2 shop must refuse to activate, with a message.
+     * Thelia 3.2 is the first core to offer the catalog price contract the product
+     * discounts plug into (CatalogPriceResolverInterface).
      */
     public function preActivation(?ConnectionInterface $con = null): bool
     {
@@ -82,7 +85,18 @@ class QueryBuilder extends BaseModule
                 // Dev dependencies of a checkout linked into a shop: not module classes.
                 __DIR__ . '/vendor/',
                 __DIR__ . '/QueryBuilder.php',
+                // Registered below, outside the scan: see there.
+                __DIR__ . '/Service/DiscountCatalogPriceResolver.php',
             ])
+            ->autowire(true)
+            ->autoconfigure(true);
+
+        //The core aliases CatalogPriceResolverInterface to its own resolver through the
+        //"singly implemented interface" rule of the loader, which spans the core and the
+        //modules of one container build: a second implementation found by the scan above
+        //removes the alias, and every reader of a price loses its resolver. Declared as
+        //a plain definition, the decorator is not counted and the alias it decorates stays.
+        $servicesConfigurator->set(DiscountCatalogPriceResolver::class)
             ->autowire(true)
             ->autoconfigure(true);
 

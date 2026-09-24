@@ -4,65 +4,91 @@ declare(strict_types=1);
 
 namespace QueryBuilder\Service;
 
+use Propel\Runtime\ActiveQuery\Criteria;
 use QueryBuilder\Discount\LinePrices;
-use Symfony\Component\HttpFoundation\RequestStack;
-use Thelia\Core\HttpFoundation\Session\Session;
-use Thelia\Model\Cart;
 use Thelia\Model\Currency;
-use Thelia\Model\Customer;
+use Thelia\Model\ProductPriceQuery;
 use Thelia\Model\ProductSaleElements;
 
 /**
- * Reads the catalog prices of a sale element exactly as the core does when it
- * prices a cart line or a product page: the row of the requested currency
- * (default currency converted when missing), the customer discount applied.
- * Every surface of the module starts from this reading so the discounted price
- * is the same on the product page, in the listings and on the cart line.
+ * Reads the catalog prices of sale elements exactly as the core does before it
+ * prices a cart line or a product page: the row of the requested currency, the
+ * default currency row converted at the rates when there is none or when it is
+ * flagged as derived from the default currency. Before the customer discount:
+ * the core applies it on top of whatever price this module answers, the way it
+ * applies it to a promo price.
  */
 final readonly class CatalogPriceReader
 {
-    public function __construct(
-        private RequestStack $requestStack,
-    ) {
+    public function inCurrency(ProductSaleElements $productSaleElements, Currency $currency): LinePrices
+    {
+        $prices = $productSaleElements->getPricesByCurrency($currency);
+
+        return new LinePrices((float) $prices->getPrice(), (float) $prices->getPromoPrice(), (int) $productSaleElements->getPromo());
     }
 
-    /** Prices of a cart line: the cart currency, the discount of the cart owner. */
-    public function forCart(ProductSaleElements $productSaleElements, Cart $cart): LinePrices
+    /**
+     * The prices of a batch in one statement.
+     *
+     * @param iterable<ProductSaleElements> $productSaleElements
+     *
+     * @return array<int, LinePrices> keyed by sale element id; a sale element with no
+     *                                price in the default currency is absent
+     */
+    public function forSaleElements(iterable $productSaleElements, Currency $currency): array
     {
-        return $this->read(
-            $productSaleElements,
-            $cart->getCurrency() ?? Currency::getDefaultCurrency(),
-            self::customerDiscount($cart->getCustomer())
-        );
-    }
+        $promoById = [];
 
-    /** Prices as the visitor sees them: the session currency, the discount of the logged-in customer. */
-    public function forSession(ProductSaleElements $productSaleElements): LinePrices
-    {
-        $session = $this->requestStack->getCurrentRequest()?->getSession();
-        $customer = $session instanceof Session ? $session->getCustomerUser() : null;
+        foreach ($productSaleElements as $productSaleElement) {
+            $promoById[(int) $productSaleElement->getId()] = (int) $productSaleElement->getPromo();
+        }
 
-        return $this->read(
-            $productSaleElements,
-            $session instanceof Session ? $session->getCurrency() : Currency::getDefaultCurrency(),
-            self::customerDiscount($customer instanceof Customer ? $customer : null)
-        );
-    }
+        if ($promoById === []) {
+            return [];
+        }
 
-    private function read(ProductSaleElements $productSaleElements, Currency $currency, float $customerDiscount): LinePrices
-    {
-        $prices = $productSaleElements->getPricesByCurrency($currency, $customerDiscount);
+        $defaultCurrency = Currency::getDefaultCurrency();
+        $currencyId = (int) $currency->getId();
+        $defaultCurrencyId = (int) $defaultCurrency->getId();
+        $rate = (float) $defaultCurrency->getRate() > 0.0 ? (float) $currency->getRate() / (float) $defaultCurrency->getRate() : 1.0;
 
-        return new LinePrices(
-            (float) $prices->getPrice(),
-            (float) $prices->getPromoPrice(),
-            (int) $productSaleElements->getPromo()
-        );
-    }
+        /** @var array<int, array{explicit: ?array{0: float, 1: float}, default: ?array{0: float, 1: float}}> $rows */
+        $rows = [];
 
-    private static function customerDiscount(?Customer $customer): float
-    {
-        //Same reading as the core: the DECIMAL column comes back as a string
-        return $customer !== null && (float) $customer->getDiscount() > 0 ? (float) $customer->getDiscount() : 0.0;
+        $productPrices = ProductPriceQuery::create()
+            ->filterByProductSaleElementsId(array_keys($promoById), Criteria::IN)
+            ->filterByCurrencyId(array_values(array_unique([$currencyId, $defaultCurrencyId])), Criteria::IN)
+            ->find();
+
+        foreach ($productPrices as $productPrice) {
+            $productSaleElementsId = (int) $productPrice->getProductSaleElementsId();
+            $pair = [(float) $productPrice->getPrice(), (float) $productPrice->getPromoPrice()];
+
+            if ((int) $productPrice->getCurrencyId() === $defaultCurrencyId) {
+                $rows[$productSaleElementsId]['default'] = $pair;
+            }
+
+            if ((int) $productPrice->getCurrencyId() === $currencyId && !$productPrice->getFromDefaultCurrency()) {
+                $rows[$productSaleElementsId]['explicit'] = $pair;
+            }
+        }
+
+        $prices = [];
+
+        foreach ($promoById as $productSaleElementsId => $promo) {
+            $row = $rows[$productSaleElementsId] ?? [];
+
+            if (isset($row['explicit'])) {
+                [$price, $promoPrice] = $row['explicit'];
+            } elseif (isset($row['default'])) {
+                [$price, $promoPrice] = [$row['default'][0] * $rate, $row['default'][1] * $rate];
+            } else {
+                continue;
+            }
+
+            $prices[$productSaleElementsId] = new LinePrices($price, $promoPrice, $promo);
+        }
+
+        return $prices;
     }
 }
