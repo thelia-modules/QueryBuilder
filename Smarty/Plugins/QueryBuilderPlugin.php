@@ -19,7 +19,7 @@ use TheliaSmarty\Template\SmartyPluginDescriptor;
  *   $qb_hook          the hook code
  *   $qb_product_ids   unique product ids selected by the display actions
  *   $qb_offers        discount offers keyed by product id (rate, label, cumulative)
- *   $qb_actions       one entry per executed display action (rule, action, product_ids, offers)
+ *   $qb_actions       one entry per executed display action (rule, action, description, product_ids, offers)
  *
  * Optional parameters forwarded to the runtime context: product_id, order_id,
  * category_id, brand_id.
