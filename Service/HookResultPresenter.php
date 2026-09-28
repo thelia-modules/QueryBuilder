@@ -28,7 +28,7 @@ final readonly class HookResultPresenter
      *     hook: string,
      *     product_ids: int[],
      *     offers: array<int, array{rate: float, label: ?string, cumulative: bool}>,
-     *     actions: array<int, array{rule: ?string, action: ?string, product_ids: int[], offers: array}>
+     *     actions: array<int, array{rule: ?string, action: ?string, description: ?string, product_ids: int[], offers: array}>
      * }
      */
     public function present(string $hookCode, RuntimeContext $runtimeContext, bool $withOffers = true): array
@@ -47,6 +47,7 @@ final readonly class HookResultPresenter
             $actions[] = [
                 'rule' => $executedAction->rule->getName(),
                 'action' => $executedAction->action->getName(),
+                'description' => $executedAction->action->getDescription(),
                 'product_ids' => $executedAction->result->productIds,
             ];
         }

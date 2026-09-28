@@ -242,8 +242,10 @@ montants s'additionnent :
 - Plugin Smarty `{queryBuilderProducts hook="..."}` — même exécution et même
   structure que l'endpoint JSON (service partagé `HookResultPresenter`),
   assigne `$qb_hook`, `$qb_product_ids`, `$qb_offers`, `$qb_actions` au
-  template. Paramètres de contexte optionnels : `product_id`, `order_id`,
-  `category_id`, `brand_id`. En cas d'erreur, assigne des listes vides et
+  template. Chaque entrée de `actions` porte `rule` et `action` (noms),
+  `description` (celle de l'action, `null` si vide — libellé libre pour le
+  front), `product_ids` et `offers`. Paramètres de contexte optionnels :
+  `product_id`, `order_id`, `category_id`, `brand_id`. En cas d'erreur, assigne des listes vides et
   loggue (ne casse jamais la page).
 
 ## Back-office
