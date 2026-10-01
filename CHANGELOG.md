@@ -4,6 +4,12 @@ All notable changes to this module are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the module adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2] 2026-10-01
+
+### Changed
+- The module is declared stable (`<stability>prod</stability>`).
+- Releases are published automatically when the version of `Config/module.xml` changes on `main`.
+
 ## [2.0.1] 2026-09-24
 
 ### Fixed
@@ -11,7 +17,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [2.0.0] 2026-09-16
 
-Port of the module to Thelia 3. The Thelia 2 line (1.0.0 to 1.2.0) lived in the project the module was written for and is not published.
+Port of the module to Thelia 3. The Thelia 2 line (1.x) is maintained on the `thelia2` branch.
 
 ### Added
 - Back-office screens on the default-twig theme (Twig, Bootstrap 5): rule list, rule in three steps, action screen, entry in the Tools menu. Screens and menu entry follow the right granted on the module itself in the administrator profiles.
@@ -49,5 +55,6 @@ Port of the module to Thelia 3. The Thelia 2 line (1.0.0 to 1.2.0) lived in the 
 - The `/query_builder/products/{hookCode}` Symfony route, replaced by the API Platform resource.
 - The `product.top` and `product.bottom` `BaseHook` front hooks, replaced by the theme hook implementation.
 
+[2.0.2]: https://github.com/thelia-modules/QueryBuilder/releases/tag/2.0.2
 [2.0.1]: https://github.com/thelia-modules/QueryBuilder/releases/tag/2.0.1
 [2.0.0]: https://github.com/thelia-modules/QueryBuilder/releases/tag/2.0.0
