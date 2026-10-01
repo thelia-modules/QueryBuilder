@@ -53,7 +53,7 @@ final readonly class HookResultPresenter
 
         //The hook slot is shared: several rules on the same hook fill a single
         //budget (the highest action limit) in rule order, instead of stacking
-        //their own limits (#562). Presentation only — sticky cycles already
+        //their own limits. Presentation only — sticky cycles already
         //recorded by the actions are never affected.
         //Floor at 1 like SqlBuilder::compile() does on the per-action LIMIT,
         //so a hand-written "limit: 0" never blanks the whole hook slot
@@ -87,7 +87,7 @@ final readonly class HookResultPresenter
         }
 
         //The current product carries its own offer (badge « Pour vous aujourd'hui »)
-        //even though it never appears in its own recommendations (#561)
+        //even though it never appears in its own recommendations
         $offerProductIds = $runtimeContext->productId !== null && $runtimeContext->productId > 0
             ? array_values(array_unique([...$productIds, $runtimeContext->productId]))
             : $productIds;
