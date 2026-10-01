@@ -32,7 +32,7 @@ final readonly class DisplayProductsListAction implements ActionInterface
 {
     public const DEFAULT_LIMIT = 3;
 
-    //A product never appears in its own recommendations (#561) — neutral outside
+    //A product never appears in its own recommendations — neutral outside
     //a product page, where :product_id is bound to the 0 sentinel. Only for the
     //stateless selection: the sticky path filters AFTER its persistence logic
     private const CURRENT_PRODUCT_EXCLUSION = '`product`.`id` != :product_id';
@@ -102,7 +102,7 @@ final readonly class DisplayProductsListAction implements ActionInterface
 
         //Display-only filter: the sticky rotation (displayability, backfill,
         //recording) must never react to which product page is being viewed —
-        //a slot silently hidden here is not a freed slot (#561)
+        //a slot silently hidden here is not a freed slot
         if ($runtimeContext->productId !== null && $runtimeContext->productId > 0) {
             $productIds = array_values(array_diff($productIds, [$runtimeContext->productId]));
         }

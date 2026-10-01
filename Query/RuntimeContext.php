@@ -33,7 +33,7 @@ final readonly class RuntimeContext
      * Same visit without its display state: no current product, empty cart.
      * Used to re-check the conditions of an already engaged sticky cycle,
      * which must depend on the customer and the product only — never on the
-     * page being viewed (#561) nor on a product sitting in the cart, whose
+     * page being viewed nor on a product sitting in the cart, whose
      * cycle is kept alive on purpose.
      */
     public function withoutCurrentProductAndCart(): self
