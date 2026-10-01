@@ -1,4 +1,4 @@
-# 1.2.0 — #573 : les hooks orphelins (jamais consommés côté front) sont retirés
+# 1.2.0 : les hooks orphelins (jamais consommés côté front) sont retirés
 # du dictionnaire ; purge des codes fantômes encore cochés par des règles.
 
 UPDATE `query_builder_rule`

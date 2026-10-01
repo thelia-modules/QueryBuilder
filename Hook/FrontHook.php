@@ -45,7 +45,7 @@ class FrontHook extends BaseHook
         );
 
         //Same aggregation as the JSON endpoint and the Smarty plugin: the
-        //presenter dedupes and caps the shared hook slot across rules (#562).
+        //presenter dedupes and caps the shared hook slot across rules.
         //Offers are skipped: this path only renders product ids
         $result = $this->hookResultPresenter->present($event->getCode(), $runtimeContext, withOffers: false);
 
