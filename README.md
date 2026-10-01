@@ -63,18 +63,17 @@ l'éditeur est alors injectée dans l'expression (un placeholder bindé par
 garde les produits pour lesquels l'expression est vraie, `pas parmi` les
 autres (liste vide : `parmi` ne matche rien, `pas parmi` laisse tout passer).
 Cas d'usage : « Catégorie du produit déjà achetée par le client (3 derniers
-mois) » `pas parmi [Fromages à pizza, Pâtons]` — exclut les produits d'une
+mois) » `pas parmi [Cafés, Thés]` — exclut les produits d'une
 catégorie choisie dont le client a déjà acheté un produit de la même
 catégorie, sans jamais impacter les produits des autres catégories (champ
-déclaré dans l'override Scal, son `values_query` s'appuyant sur les
-catalogues clients).
+déclaré dans l'override d'un module du projet).
 
 Un champ peut déclarer `values_query: <SQL>` (colonne `value` obligatoire,
 `label` et `group` optionnelles, `:locale` autorisé) : l'éditeur BO propose
 alors une liste déroulante des valeurs possibles (multiselect pour
 `in`/`notIn`) au lieu d'un champ libre. Une colonne `group` découpe la liste
 en sections `<optgroup>`, dans l'ordre des lignes SQL (ex : catégories
-groupées par catalogue client). La requête n'est exécutée que sur les écrans
+groupées par catégorie parente). La requête n'est exécutée que sur les écrans
 d'édition ; au-delà de 300 valeurs ou en cas d'erreur SQL, retour silencieux
 au champ libre (loggé).
 
