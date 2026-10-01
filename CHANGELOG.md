@@ -4,7 +4,7 @@ All notable changes to this module are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the module adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.1.0] 2026-09-24
+## [2.1.0] 2026-10-02
 
 Product discounts served through the catalog price contract of the core. Requires Thelia 3.2.
 
@@ -17,6 +17,8 @@ Product discounts served through the catalog price contract of the core. Require
 - Requires Thelia 3.2 (`thelia/core` ^3.2, `<thelia>3.2.0</thelia>`); activation is refused on an older core with the message naming the required version.
 - The cart discount fragment names the product discount charged on a line by recomputing what the core wrote from it (the module price, then the customer discount) instead of comparing the line with the module's own writing.
 - The rules of a discount are evaluated without a current product on every surface: the core asks for a batch of sale elements, never for a page.
+- The module is declared stable (`<stability>prod</stability>`).
+- Releases are published automatically when the version of `Config/module.xml` changes on `main`.
 
 ### Fixed
 - A request of the stateless API (no session cookie) no longer fails on a product read: the `QueryBuilderProductOffer` addon and the query builder products endpoint asked the session for the cart and restored it, which created a cart and threw without a session. The runtime context now reads the cart the session names, never restores one, and treats a visit without cart as an empty cart; every session access of the module is guarded the way the core guards its own.
@@ -32,7 +34,7 @@ Product discounts served through the catalog price contract of the core. Require
 
 ## [2.0.0] 2026-09-16
 
-Port of the module to Thelia 3. The Thelia 2 line (1.0.0 to 1.2.0) lived in the project the module was written for and is not published.
+Port of the module to Thelia 3. The Thelia 2 line (1.x) is maintained on the `thelia2` branch.
 
 ### Added
 - Back-office screens on the default-twig theme (Twig, Bootstrap 5): rule list, rule in three steps, action screen, entry in the Tools menu. Screens and menu entry follow the right granted on the module itself in the administrator profiles.

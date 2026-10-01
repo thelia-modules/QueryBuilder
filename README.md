@@ -10,6 +10,8 @@ Only the fields of a data dictionary and a closed list of operators are accepted
 - PHP 8.3+
 - `openstudio/query-builder-bundle` ^1.1 (the back-office editor)
 
+Thelia 2 shops use the 1.x line, maintained on the [`thelia2`](https://github.com/thelia-modules/QueryBuilder/tree/thelia2) branch.
+
 ## Installation
 
 ```bash
