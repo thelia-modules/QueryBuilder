@@ -4,6 +4,13 @@ All notable changes to this module are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the module adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] 2026-10-05
+
+### Fixed
+- The back-office pages of the module answered 500 on default-twig 1.2.0, which removed the `token_url()` Twig function: the rule and action forms now carry the CSRF token in a hidden field, never in the URL.
+- Uninstalling the module with its data now drops its three tables.
+- The back-office hook imported the parser resolver from a namespace the core does not ship.
+
 ## [2.1.0] 2026-10-02
 
 Product discounts served through the catalog price contract of the core. Requires Thelia 3.2.
