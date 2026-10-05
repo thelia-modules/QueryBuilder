@@ -7,6 +7,7 @@ namespace QueryBuilder;
 use OpenStudio\QueryBuilderBundle\Form\QueryBuilderType;
 use OpenStudio\QueryBuilderBundle\Service\FormOptionsNormalizer;
 use Propel\Runtime\Connection\ConnectionInterface;
+use Propel\Runtime\Propel;
 use QueryBuilder\Service\DiscountCatalogPriceResolver;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
 use Symfony\Component\Finder\Finder;
@@ -46,6 +47,20 @@ class QueryBuilder extends BaseModule
 
             self::setConfigValue('is_initialized', true);
         }
+    }
+
+    public function destroy(?ConnectionInterface $con = null, $deleteModuleData = false): void
+    {
+        if (!$deleteModuleData) {
+            return;
+        }
+
+        $con ??= Propel::getConnection();
+
+        // Children first: the foreign keys would refuse the parent while they are there.
+        $con->exec('DROP TABLE IF EXISTS `query_builder_suggestion`');
+        $con->exec('DROP TABLE IF EXISTS `query_builder_action`');
+        $con->exec('DROP TABLE IF EXISTS `query_builder_rule`');
     }
 
     public function update($currentVersion, $newVersion, ?ConnectionInterface $con = null): void
