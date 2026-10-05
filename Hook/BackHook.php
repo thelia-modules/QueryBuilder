@@ -11,7 +11,7 @@ use Thelia\Core\Event\Hook\HookRenderEvent;
 use Thelia\Core\Hook\BaseHook;
 use Thelia\Core\Security\AccessManager;
 use Thelia\Core\Security\SecurityContext;
-use Thelia\Core\Template\ParserResolver;
+use Thelia\Core\Template\Parser\ParserResolver;
 use Thelia\Tools\URL;
 
 /**
