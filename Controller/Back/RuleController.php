@@ -274,7 +274,7 @@ class RuleController extends BaseAdminController
             return $response;
         }
 
-        $tokenProvider->checkToken((string) $request->query->get('_token'));
+        $tokenProvider->checkRequestToken($request);
 
         $rule = QueryBuilderRuleQuery::create()->findOneById($ruleId);
 
@@ -297,7 +297,7 @@ class RuleController extends BaseAdminController
             return $response;
         }
 
-        $tokenProvider->checkToken((string) $request->query->get('_token'));
+        $tokenProvider->checkRequestToken($request);
 
         $rule = QueryBuilderRuleQuery::create()->findOneById($ruleId);
 

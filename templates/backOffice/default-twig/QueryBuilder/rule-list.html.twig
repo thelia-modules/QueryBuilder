@@ -82,7 +82,8 @@
                                 <td class="text-center">{{ rule.action_count }}</td>
                                 <td class="text-center">
                                     {% if is_granted('UPDATE', { module: 'QueryBuilder' }) %}
-                                        <form method="post" action="{{ token_url('admin_query_builder_rule_toggle', { ruleId: rule.id }) }}" class="d-inline">
+                                        <form method="post" action="{{ path('admin_query_builder_rule_toggle', { ruleId: rule.id }) }}" class="d-inline">
+                                            <input type="hidden" name="_token" value="{{ assignToken() }}">
                                             {% if rule.activate %}
                                                 <button type="submit" class="btn btn-sm btn-success" title="{{ 'Click to deactivate'|trans({}, d) }}">{{ 'Active'|trans({}, d) }}</button>
                                             {% else %}
@@ -104,7 +105,8 @@
                                         </a>
                                     {% endif %}
                                     {% if is_granted('DELETE', { module: 'QueryBuilder' }) %}
-                                        <form method="post" action="{{ token_url('admin_query_builder_rule_delete', { ruleId: rule.id }) }}" class="d-inline" onsubmit="return confirm({{ 'Delete this rule and its actions?'|trans({}, d)|json_encode|e('html_attr') }});">
+                                        <form method="post" action="{{ path('admin_query_builder_rule_delete', { ruleId: rule.id }) }}" class="d-inline" onsubmit="return confirm({{ 'Delete this rule and its actions?'|trans({}, d)|json_encode|e('html_attr') }});">
+                                            <input type="hidden" name="_token" value="{{ assignToken() }}">
                                             <button type="submit" class="btn btn-sm btn-outline-danger" title="{{ 'Delete'|trans({}, d) }}">
                                                 <i class="bi bi-trash" aria-hidden="true"></i>
                                             </button>

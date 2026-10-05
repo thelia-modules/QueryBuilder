@@ -234,7 +234,7 @@ class ActionController extends BaseAdminController
             return $response;
         }
 
-        $tokenProvider->checkToken((string) $request->query->get('_token'));
+        $tokenProvider->checkRequestToken($request);
 
         $action = QueryBuilderActionQuery::create()->filterByRuleId($ruleId)->findOneById($actionId);
 
@@ -258,7 +258,7 @@ class ActionController extends BaseAdminController
             return $response;
         }
 
-        $tokenProvider->checkToken((string) $request->query->get('_token'));
+        $tokenProvider->checkRequestToken($request);
 
         $action = QueryBuilderActionQuery::create()->filterByRuleId($ruleId)->findOneById($actionId);
 
