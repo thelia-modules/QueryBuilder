@@ -196,13 +196,13 @@ paramètres (limite, libellé, taux…) ne réinitialise rien.
 compris à l'ajout au panier, à la suppression d'une ligne (les lignes
 restantes sont alors re-remisées) et à la création de commande. Les conditions de
 sélection reco y sont auto-destructrices : « produit présent dans le panier =
-faux » annule la remise à l'instant où le produit entre au panier, « acheté
-récemment = faux » l'annule à la création de commande (la ligne venant d'être
-créée). Réserver l'arbre d'une remise à des critères stables (typologie,
-nature, marque, visibilité…). Exception : « Catégorie du produit déjà achetée
-par le client (3 derniers mois) » ne compte que les commandes abouties
-(statuts hors non payée/annulée), la commande en cours de création ne
-l'invalide donc pas.
+faux » annule la remise à l'instant où le produit entre au panier. Réserver
+l'arbre d'une remise à des critères stables (typologie, nature, marque,
+visibilité…). « Produit acheté par le client au cours des 3 derniers mois »
+ne compte que les commandes abouties (statuts hors non payée/annulée) : la
+commande en cours de création, encore non payée, ne l'invalide donc pas. Un
+champ projet du même type (ex. « catégorie déjà achetée ») doit appliquer le
+même filtre de statut.
 
 ## Remise globale panier (action `ApplyCartDiscount`)
 

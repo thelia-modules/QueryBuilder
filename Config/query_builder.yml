@@ -125,6 +125,6 @@ fields:
         type: boolean
     customer_purchased_last_3_months:
         label: "Produit acheté par le client au cours des 3 derniers mois"
-        expression: "EXISTS (SELECT 1 FROM `order` qb_ord JOIN `order_product` qb_ordp ON qb_ordp.order_id = qb_ord.id WHERE qb_ord.customer_id = :customer_id AND qb_ordp.product_ref = product.ref AND qb_ord.created_at >= DATE_SUB(NOW(), INTERVAL 3 MONTH))"
+        expression: "EXISTS (SELECT 1 FROM `order` qb_ord JOIN `order_product` qb_ordp ON qb_ordp.order_id = qb_ord.id JOIN `order_status` qb_ords ON qb_ords.id = qb_ord.status_id WHERE qb_ord.customer_id = :customer_id AND qb_ordp.product_ref = product.ref AND qb_ords.code NOT IN ('not_paid', 'canceled') AND qb_ord.created_at >= DATE_SUB(NOW(), INTERVAL 3 MONTH))"
         type: boolean
 disabled: []
