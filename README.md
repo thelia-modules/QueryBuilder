@@ -8,7 +8,7 @@ Only the fields of a data dictionary and a closed list of operators are accepted
 
 - Thelia 3.2 or later (`thelia/core` ^3.2: the catalog price contract the product discounts plug into), Flexy front theme, default-twig back-office
 - PHP 8.3+
-- `openstudio/query-builder-bundle` ^1.1 (the back-office editor)
+- `openstudio/query-builder-bundle` ^1.2 (the back-office editor)
 
 Thelia 2 shops use the 1.x line, maintained on the [`thelia2`](https://github.com/thelia-modules/QueryBuilder/tree/thelia2) branch.
 
@@ -75,7 +75,7 @@ Runtime placeholders: `:customer_id`, `:cart_id`, `:cart_product_ids`, `:product
 
 An expression may contain the `:value` token: the value entered in the editor is then expanded inside the expression, one placeholder per item, and the field must restrict its `operators` to `in` and `notIn`, which only set the polarity, or to `=` and `!=`, compiled as a one-item `in` and `notIn`. The "list of values" pick of a field with a `values_query` is stored as `=`, so such a field needs no more than `[in, notIn]` for the pick to compile.
 
-Field types: `text`, `number`, `date`, `datetime` (entered as a date, compared on `DATE()`), `boolean`. A field may declare `values_query` (a `value` column, an optional `label` column, `:locale` allowed): the editor then offers a "list of values" select next to the free operators. Beyond 300 rows or on SQL error the field falls back to the free input. Labels of fields and hooks are translation keys of the `querybuilder` domain.
+Field types: `text`, `number`, `date`, `datetime` (entered as a date, compared on `DATE()`), `boolean`. A field may declare `values_query` (a `value` column, an optional `label` column, `:locale` allowed): the editor then offers a "list of values" select next to the free operators, and a multiselect for `in` and `notIn`, stored as an array. Beyond 1000 rows or on SQL error the field falls back to the free input. Labels of fields and hooks are translation keys of the `querybuilder` domain.
 
 A field declares the contexts it is offered in with `contexts`, a list of `QueryBuilder\Enum\Context` values; `GLOBAL`, the default, means every context, and a `GLOBAL` rule itself only sees `GLOBAL` fields. Restrict a field to the contexts where its placeholder is filled: `:product_id` to `PRODUCT`, `:category_id` to `CATEGORY`, `:brand_id` to `BRAND`, `:order_id` to `ORDER`. The cart and the customer come from the session in every context, so their fields stay `GLOBAL` (a `PRODUCT` rule can select the products sharing a brand with the cart). A field also declares the editors it is offered in with `usage`, a list among `rule` (trigger conditions) and `action` (product selection), both by default: a field comparing the selected product to the object of the context is always true in the rule editor and belongs to `[action]`, a field reading the object itself (`:category_id` in a list) selects all or nothing in the action editor and belongs to `[rule]`.
 

@@ -18,8 +18,9 @@ use Thelia\Log\Tlog;
  */
 final readonly class FieldsBuilder
 {
-    //Beyond this size a select is unusable: fall back to the free input
-    private const MAX_VALUES = 300;
+    //Beyond this size a select is unusable: fall back to the free input. A shop's category tree
+    //easily passes 300 entries, still usable in a select searched by typing
+    private const MAX_VALUES = 1000;
 
     //The editor stores the values picked in a select as a plain equality
     private const VALUES_LIST_OPERATOR = 'valuesList';
