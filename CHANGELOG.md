@@ -4,6 +4,15 @@ All notable changes to this module are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the module adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] 2026-11-06
+
+### Changed
+- `in` and `notIn` on a field with a `values_query` pick the values in a multiselect instead of typing ids in a textarea (`openstudio/query-builder-bundle` 1.2, now required as `^1.2`, built into the editor script). The picked values are stored as an array, which `SqlBuilder` already reads; a list saved before as a comma-separated string reopens in the multiselect.
+- A `values_query` falls back to the free input beyond 1000 rows instead of 300: a category tree of a few hundred entries kept every category field (`product_default_category`, `cart_has_category`, `context_category_id`, `context_category_parent_id`, `product_category_title`) on the free input, without any list.
+
+### Added
+- `product_category_id` ("Category (ID)") lists the categories, like the other category fields.
+
 ## [2.2.0] 2026-11-06
 
 Fixes of the 1.x line (1.4.0 to 1.6.1) carried over to 2.x.
@@ -90,6 +99,9 @@ Port of the module to Thelia 3. The Thelia 2 line (1.x) is maintained on the `th
 - The `/query_builder/products/{hookCode}` Symfony route, replaced by the API Platform resource.
 - The `product.top` and `product.bottom` `BaseHook` front hooks, replaced by the theme hook implementation.
 
+[2.2.1]: https://github.com/thelia-modules/QueryBuilder/releases/tag/2.2.1
+[2.2.0]: https://github.com/thelia-modules/QueryBuilder/releases/tag/2.2.0
+[2.1.1]: https://github.com/thelia-modules/QueryBuilder/releases/tag/2.1.1
 [2.1.0]: https://github.com/thelia-modules/QueryBuilder/releases/tag/2.1.0
 [2.0.1]: https://github.com/thelia-modules/QueryBuilder/releases/tag/2.0.1
 [2.0.0]: https://github.com/thelia-modules/QueryBuilder/releases/tag/2.0.0

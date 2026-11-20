@@ -57,8 +57,9 @@
 # fields.<code>.operators  : restrict allowed operators (react-querybuilder names)
 # fields.<code>.values_query : SQL listing the possible values — "value" column required, "label"
 #                              optional, :locale allowed. The BO editor then offers a select ("list of
-#                              values" operator) next to the free operators. Executed on the editor
-#                              screens only; falls back to the free input beyond 300 rows or on SQL
+#                              values" operator, and a multiselect for in/notIn) next to the free
+#                              operators. Executed on the editor screens only; falls back to the free
+#                              input beyond 1000 rows or on SQL
 #                              error. Not allowed on boolean fields.
 #
 # contexts.<CONTEXT>: hooks usable by rules of this context. Each entry is either a plain
@@ -149,6 +150,7 @@ fields:
         label: "Category (ID)"
         field: product_category.category_id
         type: number
+        values_query: "SELECT c.id AS value, ci.title AS label FROM category c JOIN category_i18n ci ON ci.id = c.id AND ci.locale = :locale ORDER BY ci.title"
     product_category_title:
         label: "Product category title"
         field: category_i18n.title
