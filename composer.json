@@ -22,7 +22,7 @@
     "openstudio/query-builder-bundle": "^1.1"
   },
   "require-dev": {
-    "thelia/core": "^3.2",
+    "thelia/core": "^3.4",
     "phpunit/phpunit": "^11.5"
   },
   "autoload": {
