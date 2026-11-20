@@ -4,6 +4,14 @@ All notable changes to this module are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the module adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] 2026-11-20
+
+### Changed
+- Requires Thelia 3.4 (`<thelia>3.4.0</thelia>`): shops on Thelia 3.2 or 3.3 stay on 2.2.0.
+
+### Fixed
+- The kernel boots again on Thelia 3.4: the decorator of the core `PricingActivityChecker` is built on its 3.4 constructor, and every question a public catalog rule answers (`mayPriceBeyondCatalog()`, `mayResolveEffectivePriceFor()`, `pricesDependOnWhoIsAsking()`…) also answers yes while a discount rule is on, since the core no longer asks `hasActivePublicRule()` for them.
+
 ## [2.2.0] 2026-11-06
 
 Fixes of the 1.x line (1.4.0 to 1.6.1) carried over to 2.x.
